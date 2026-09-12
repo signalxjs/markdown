@@ -228,6 +228,11 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
                 consumed = boundary('Escape', range);
                 break;
         }
+        if (consumed === null && mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'a') {
+            // Select-all is progressive: the block's own text first (the browser's default), every block on the next press.
+            consumed = collapsed || range.start > 0 || range.end < len ? false : forwardKey(e, range);
+            if (len === 0) consumed = forwardKey(e, range);
+        }
         if (consumed === null) {
             // Everything else reaches the keymap only when it is a chord or a named key; plain typing stays with the browser.
             const named = e.key.length > 1 && e.key !== 'Unidentified' && e.key !== 'Dead';

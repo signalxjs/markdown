@@ -109,6 +109,21 @@ describe('DomInlineSurface', () => {
         expect(ev.log.some((l) => l.startsWith('boundary:'))).toBe(false);
     });
 
+    it('Mod-a selects the block text first and reaches the keymap only once everything is selected', () => {
+        const { surface, ev } = make({ text: 'ab', spans: [] });
+        surface.focus({ offset: 1 });
+        expect(keydown(surface, 'a', { metaKey: true })).toBe(true);
+        expect(ev.log).not.toContain('key:Mod-a');
+        surface.setSelection({ start: 0, end: 2 });
+        keydown(surface, 'a', { metaKey: true });
+        expect(ev.log).toContain('key:Mod-a');
+        // An empty block has nothing to select: straight to the keymap.
+        const empty = make({ text: '', spans: [] });
+        empty.surface.focus({ offset: 0 });
+        keydown(empty.surface, 'a', { metaKey: true });
+        expect(empty.ev.log).toContain('key:Mod-a');
+    });
+
     it('reports arrows at the edges, Tab and Escape as boundaries and consumes them', () => {
         const { surface, ev } = make({ text: 'ab', spans: [] });
         surface.focus({ offset: 0 });

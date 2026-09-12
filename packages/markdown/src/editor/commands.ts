@@ -1052,23 +1052,29 @@ export const insertBlocks =
             steps.push({ type: 'replaceInline', key, from, to, slice });
             selection = textSelection(key, from + slice.text.length);
         } else if (ctx.schema.kind(entry.node.type) === 'inline') {
-            // Split the current block around the selection, merge the first/last pasted inline blocks into the halves.
+            // Split the current block around the selection; a pasted paragraph at either
+            // edge merges into that half (a heading, list or code block stays its own block).
             const flat = inlineFlat(state, key, ctx)!;
             const head = sliceFlat(flat, 0, from);
             const tail = sliceFlat(flat, to, flat.text.length);
             const list = blocks.slice();
             let headFlat = head;
-            if (ctx.schema.kind(list[0].type) === 'inline') headFlat = concatFlat(head, toFlat((list.shift() as { children: PhrasingContent[] }).children, ctx.inline));
+            if (list[0].type === 'paragraph') headFlat = concatFlat(head, toFlat((list.shift() as { children: PhrasingContent[] }).children, ctx.inline));
             let tailFlat = tail;
             let lastKey: string | null = null;
             let lastOffset = 0;
-            if (list.length && ctx.schema.kind(list[list.length - 1].type) === 'inline') {
+            if (list.length && list[list.length - 1].type === 'paragraph') {
                 const lastFlat = toFlat((list.pop() as { children: PhrasingContent[] }).children, ctx.inline);
                 lastOffset = lastFlat.text.length;
                 tailFlat = concatFlat(lastFlat, tail);
             }
-            steps.push({ type: 'setInline', key, flat: headFlat });
             let at = entry.index + 1;
+            if (headFlat.text.length === 0 && list.length && entry.node.type === 'paragraph') {
+                // Nothing before the caret: the first pasted block takes the paragraph's place.
+                steps.push({ type: 'replaceBlock', key, node: list.shift()! });
+            } else {
+                steps.push({ type: 'setInline', key, flat: headFlat });
+            }
             for (const b of list) steps.push({ type: 'insertBlock', parentKey: entry.parentKey, index: at++, node: b });
             if (tailFlat.text.length || list.length === 0 || lastOffset) {
                 steps.push({ type: 'insertBlock', parentKey: entry.parentKey, index: at, node: paragraph(toInline(tailFlat, ctx.inline)) });
@@ -1076,8 +1082,9 @@ export const insertBlocks =
                 selection = textSelection(lastKey, lastOffset);
             } else {
                 const lastInserted = keyAt(entry.parentKey, at - 1);
-                const first = firstEditable({ ...list[list.length - 1], key: lastInserted } as EditorBlock, ctx);
-                selection = first ? textSelection(relKey(lastInserted, list[list.length - 1], first), lengthOf(first, ctx)) : blockSelection(lastInserted);
+                // The caret lands at the end of the last inserted block (its last editable descendant for a list or quote).
+                const last = lastEditable({ ...list[list.length - 1], key: lastInserted } as EditorBlock, ctx);
+                selection = last ? textSelection(relKey(lastInserted, list[list.length - 1], last), lengthOf(last, ctx)) : blockSelection(lastInserted);
             }
         } else {
             let at = entry.index + 1;
