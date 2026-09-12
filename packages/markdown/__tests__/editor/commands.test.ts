@@ -349,6 +349,16 @@ describe('paste', () => {
         expect(endsWithBlock.state.selection).toEqual(at('b-2', 0));
     });
 
+    it('pastes only paragraphs into the edges; a heading or list stays its own block', () => {
+        const r = run('ab', at('b-0', 2), C.pasteText('## H\n\n- x\n- y'));
+        expect(r.md).toBe('ab\n\n## H\n\n- x\n- y\n');
+        expect(r.state.selection).toEqual(at('b-2.1.0', 1));
+        // At the start of an empty paragraph the first block replaces it instead of leaving an empty paragraph behind.
+        const empty = run('', at('b-0', 0), C.pasteText('## H\n\ntext'));
+        expect(empty.md).toBe('## H\n\ntext\n');
+        expect(empty.state.selection).toEqual(at('b-1', 4));
+    });
+
     it('pastes blocks after a code block', () => {
         const r = run('```\nx\n```', at('b-0', 1), C.pasteText('a\n\nb'));
         expect(r.md).toBe('```\nx\n```\n\na\n\nb\n');

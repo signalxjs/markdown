@@ -42,6 +42,17 @@
     ]
   },
   {
+    "name": "@sigx/markdown/editor/dom",
+    "path": "packages/markdown/dist/editor/dom.prod.js",
+    "limit": "48 KB",
+    "ignore": [
+      "@sigx/markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom"
+    ]
+  },
+  {
     "name": "@sigx/markdown/testing",
     "path": "packages/markdown/dist/testing.prod.js",
     "limit": "6 KB",

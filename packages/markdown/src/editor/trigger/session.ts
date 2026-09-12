@@ -16,7 +16,7 @@
  * `debounce` batches fast typing.
  */
 
-import type { Dispatch, commands } from '../commands.js';
+import type { Command, Dispatch, commands } from '../commands.js';
 import type { InlineFlat } from '../inline-flat.js';
 import type { EditorState } from '../state.js';
 
@@ -42,6 +42,8 @@ export interface TriggerSelectApi {
     commands: typeof commands;
     dispatch: Dispatch;
     state: EditorState;
+    /** Run a command (or a registered name) against the editor; its result. */
+    run(command: Command | string): boolean;
 }
 
 interface TriggerSpecBase {

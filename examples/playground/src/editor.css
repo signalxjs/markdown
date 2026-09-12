@@ -1,0 +1,370 @@
+/*
+ * Reference stylesheet for @sigx/markdown's DOM editor.
+ *
+ * Like the view, the editor ships no CSS. Its elements carry
+ * `data-scope="markdown-editor"` (blocks, surfaces, handles),
+ * `data-scope="markdown-toolbar"`, `data-scope="markdown-block-menu"` and
+ * `data-scope="markdown-suggest"` with `data-part="<name>"`; state is
+ * `data-state="on|off"` on toolbar buttons and bare flags (`data-selected`,
+ * `data-empty`, `data-readonly`, `data-active`). Tokens come from
+ * `styles.css` (`--md-*`).
+ */
+
+/* ---- Root and blocks -------------------------------------------------- */
+
+[data-scope='markdown-editor'][data-part='root'] {
+    color: var(--md-fg);
+    font-size: 1rem;
+    line-height: 1.6;
+    outline: none;
+    border-radius: var(--md-radius);
+}
+
+[data-scope='markdown-editor'][data-part='root']:focus-visible {
+    box-shadow: 0 0 0 2px var(--md-accent);
+}
+
+[data-scope='markdown-editor'][data-part='content'] {
+    min-height: 8rem;
+    padding: 0.25rem 0 2rem;
+}
+
+[data-scope='markdown-editor'][data-part='block'] {
+    position: relative;
+    padding-left: 1.5rem;
+    border-radius: var(--md-radius);
+}
+
+[data-scope='markdown-editor'][data-part='block'][data-selected],
+[data-scope='markdown-editor'][data-part='list-item'][data-selected] {
+    background: color-mix(in srgb, var(--md-accent) 14%, transparent);
+}
+
+/* The handle: hidden until the block is hovered or focused within. */
+[data-scope='markdown-editor'][data-part='handle'] {
+    position: absolute;
+    left: 0;
+    top: 0.2em;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--md-muted);
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 120ms;
+}
+
+[data-scope='markdown-editor'][data-part='block']:hover > [data-scope='markdown-editor'][data-part='handle'],
+[data-scope='markdown-editor'][data-part='block']:focus-within > [data-scope='markdown-editor'][data-part='handle'],
+[data-scope='markdown-editor'][data-part='handle']:focus-visible {
+    opacity: 1;
+}
+
+[data-scope='markdown-editor'][data-part='handle']:hover {
+    background: var(--md-surface);
+    color: var(--md-fg);
+}
+
+/* ---- Inline surfaces ---------------------------------------------------- */
+
+[data-scope='markdown-editor'][data-part='inline'] {
+    margin: 0;
+    padding: 0.15em 0.25rem;
+    min-height: 1.6em;
+    outline: none;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    border-radius: 4px;
+}
+
+[data-scope='markdown-editor'][data-part='inline']:focus {
+    background: color-mix(in srgb, var(--md-accent) 6%, transparent);
+}
+
+[data-scope='markdown-editor'][data-part='inline'][data-empty][data-placeholder]::before {
+    content: attr(data-placeholder);
+    color: var(--md-muted);
+    pointer-events: none;
+    position: absolute;
+}
+
+[data-scope='markdown-editor'][data-part='inline'][data-type='heading'] {
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 0.6em 0 0.2em;
+}
+
+[data-scope='markdown-editor'][data-part='inline'][data-depth='1'] {
+    font-size: 2em;
+}
+
+[data-scope='markdown-editor'][data-part='inline'][data-depth='2'] {
+    font-size: 1.5em;
+}
+
+[data-scope='markdown-editor'][data-part='inline'][data-depth='3'] {
+    font-size: 1.25em;
+}
+
+/* Marks are plain semantic tags inside the surface. */
+[data-scope='markdown-editor'][data-part='inline'] code {
+    font: 0.9em ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--md-code-bg);
+    border-radius: 4px;
+    padding: 0.1em 0.3em;
+}
+
+[data-scope='markdown-editor'][data-part='inline'] a {
+    color: var(--md-accent);
+    text-decoration: underline;
+}
+
+/* Atoms: chips the caret jumps over. */
+[data-scope='markdown-editor'][data-part='inline'] [data-atom] {
+    display: inline-block;
+    user-select: none;
+    vertical-align: baseline;
+}
+
+[data-scope='markdown-editor'][data-part='mention'] {
+    padding: 0.05em 0.4em;
+    border-radius: 999px;
+    background: var(--md-mention-bg);
+    color: var(--md-mention-fg);
+    font-weight: 500;
+}
+
+[data-scope='markdown-editor'][data-part='inline'] [data-atom='image'] img {
+    max-height: 1.6em;
+    vertical-align: middle;
+    border-radius: 3px;
+}
+
+/* ---- Containers ---------------------------------------------------------- */
+
+[data-scope='markdown-editor'][data-part='blockquote'] {
+    margin: 0.25em 0;
+    padding-left: 0.75em;
+    border-left: 3px solid var(--md-quote-border);
+    color: var(--md-muted);
+}
+
+[data-scope='markdown-editor'][data-part='list'] {
+    margin: 0.25em 0;
+    padding-left: 1.5em;
+}
+
+[data-scope='markdown-editor'][data-part='list-item'] {
+    position: relative;
+    border-radius: 4px;
+}
+
+[data-scope='markdown-editor'][data-part='list-item'][data-task] {
+    list-style: none;
+    margin-left: -1.5em;
+    padding-left: 1.5em;
+}
+
+[data-scope='markdown-editor'][data-part='task-check'] {
+    position: absolute;
+    left: 0;
+    top: 0.45em;
+    margin: 0;
+}
+
+[data-scope='markdown-editor'][data-part='list-item'] > [data-scope='markdown-editor'][data-part='block'] {
+    padding-left: 0;
+}
+
+[data-scope='markdown-editor'][data-part='list-item'] > [data-scope='markdown-editor'][data-part='block'] > [data-part='handle'] {
+    display: none;
+}
+
+/* ---- Code -------------------------------------------------------------- */
+
+[data-scope='markdown-editor'][data-part='code'] {
+    margin: 0.5em 0;
+    border: 1px solid var(--md-border);
+    border-radius: var(--md-radius);
+    background: var(--md-code-bg);
+    overflow: hidden;
+}
+
+[data-scope='markdown-editor'][data-part='code-header'] {
+    display: flex;
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--md-border);
+}
+
+[data-scope='markdown-editor'][data-part='code-lang'] {
+    border: 0;
+    background: transparent;
+    color: var(--md-muted);
+    font: 0.75rem ui-monospace, monospace;
+    outline: none;
+    width: 8rem;
+}
+
+[data-scope='markdown-editor'][data-part='code-body'] {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 3em;
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    border: 0;
+    resize: none;
+    outline: none;
+    background: transparent;
+    color: var(--md-code-fg);
+    font: 0.875em/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre;
+    overflow-x: auto;
+    field-sizing: content;
+}
+
+/* ---- Void blocks and tables ---------------------------------------------- */
+
+[data-scope='markdown-editor'][data-part='void'] {
+    padding: 0.4em 0.25rem;
+    cursor: default;
+}
+
+[data-scope='markdown-editor'][data-part='table'] {
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    width: 100%;
+}
+
+[data-scope='markdown-editor'][data-part='table-cell'] {
+    border: 1px solid var(--md-border);
+    padding: 0;
+    vertical-align: top;
+}
+
+[data-scope='markdown-editor'][data-part='table-row'][data-header] {
+    background: var(--md-surface);
+    font-weight: 600;
+}
+
+[data-scope='markdown-editor'][data-part='table-cell'] > [data-part='inline'] {
+    padding: 0.35em 0.6em;
+}
+
+/* ---- Toolbar ------------------------------------------------------------ */
+
+[data-scope='markdown-toolbar'][data-part='root'] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    padding: 0.35rem 0.5rem;
+    border-bottom: 1px solid var(--md-border);
+    background: var(--md-surface);
+    border-radius: var(--md-radius) var(--md-radius) 0 0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+[data-scope='markdown-toolbar'][data-part='group'] {
+    display: flex;
+    gap: 0.125rem;
+}
+
+[data-scope='markdown-toolbar'][data-part='item'] {
+    min-width: 2rem;
+    height: 1.75rem;
+    padding: 0 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--md-fg);
+    font: 600 0.8rem system-ui, sans-serif;
+    cursor: pointer;
+}
+
+[data-scope='markdown-toolbar'][data-part='item']:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--md-fg) 8%, transparent);
+}
+
+[data-scope='markdown-toolbar'][data-part='item'][data-state='on'] {
+    background: color-mix(in srgb, var(--md-accent) 18%, transparent);
+    border-color: var(--md-accent);
+    color: var(--md-accent);
+}
+
+[data-scope='markdown-toolbar'][data-part='item']:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* ---- Popups: block menu and suggestions ----------------------------------- */
+
+[data-scope='markdown-block-menu'][data-part='root'],
+[data-scope='markdown-suggest'][data-part='root'] {
+    z-index: 10;
+    min-width: 12rem;
+    padding: 0.25rem;
+    border: 1px solid var(--md-border);
+    border-radius: var(--md-radius);
+    background: var(--md-bg);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+    font-size: 0.875rem;
+}
+
+[data-scope='markdown-block-menu'][data-part='label'] {
+    padding: 0.25rem 0.5rem;
+    color: var(--md-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+[data-scope='markdown-block-menu'][data-part='separator'] {
+    height: 1px;
+    margin: 0.25rem 0;
+    background: var(--md-border);
+}
+
+[data-scope='markdown-block-menu'][data-part='item'],
+[data-scope='markdown-suggest'][data-part='item'] {
+    display: block;
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--md-fg);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+[data-scope='markdown-block-menu'][data-part='item']:hover,
+[data-scope='markdown-block-menu'][data-part='item']:focus-visible,
+[data-scope='markdown-suggest'][data-part='item'][data-active] {
+    background: color-mix(in srgb, var(--md-accent) 14%, transparent);
+    outline: none;
+}
+
+[data-scope='markdown-suggest'][data-part='list'] {
+    max-height: inherit;
+    overflow-y: auto;
+}
+
+[data-scope='markdown-suggest'][data-part='empty'],
+[data-scope='markdown-suggest'][data-part='loading'] {
+    padding: 0.35rem 0.5rem;
+    color: var(--md-muted);
+}
+
+/* ---- Playground layout ----------------------------------------------------- */
+
+.pane-editor > .body {
+    padding: 0;
+}

@@ -17,6 +17,8 @@ import {
     type NodeProps
 } from '@sigx/markdown';
 import { MarkdownView, type DomMarkdownComponents } from '@sigx/markdown/dom';
+import { createSlashPlugin } from '@sigx/markdown/editor';
+import { MarkdownEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
 
 // Register the mention node with the AST and type its component slot: this
 // is the consumer-side half of the plugin contract (the package does not do
@@ -85,6 +87,22 @@ That's it. Edit the source on the left; hit **Stream** to replay it token by tok
 const NO_PLUGINS: readonly MarkdownPlugin[] = [];
 const WITH_MENTION: readonly MarkdownPlugin[] = [mentionPlugin];
 
+/** Who `@` can mention in the editor. */
+const PEOPLE = [
+    { id: 'u1', label: 'Andy' },
+    { id: 'u2', label: 'Bea' },
+    { id: 'u3', label: 'Chris' },
+    { id: 'u4', label: 'Dana' }
+];
+
+/** The editor's plugins: the mention syntax + `@` trigger + chip, and `/` block commands. Captured at mount. */
+const EDITOR_PLUGINS: readonly MarkdownPlugin[] = [
+    createDomMentionPlugin({
+        onQuery: (q) => PEOPLE.filter((p) => p.label.toLowerCase().startsWith(q.toLowerCase()))
+    }),
+    createSlashPlugin()
+];
+
 /** The `mention` slot: a plain function, called by the render engine with the node. */
 const MentionChip = ({ node }: NodeProps<JSXElement, Mention>): JSXElement => (
     <span data-scope="markdown" data-part="mention" title={node.id}>
@@ -105,7 +123,8 @@ export const App = component(({ signal, onUnmounted }) => {
         charsPerTick: 3,
         tickMs: 16,
         streaming: false,
-        lastLink: ''
+        lastLink: '',
+        editor: false
     });
 
     // ---- Shiki: loaded on first toggle so the initial bundle stays small ----
@@ -222,6 +241,17 @@ export const App = component(({ signal, onUnmounted }) => {
                     Dark
                 </label>
                 <label>
+                    <input
+                        type="checkbox"
+                        data-testid="toggle-editor"
+                        checked={state.editor}
+                        onChange={() => {
+                            state.editor = !state.editor;
+                        }}
+                    />
+                    Editor
+                </label>
+                <label>
                     chars/tick
                     <input
                         type="number"
@@ -260,18 +290,34 @@ export const App = component(({ signal, onUnmounted }) => {
             </header>
 
             <main class="panes">
-                <section class="pane">
-                    <h2>Source</h2>
-                    <textarea
-                        data-testid="source"
-                        aria-label="Markdown source"
-                        spellCheck={false}
-                        value={state.source}
-                        onInput={(e) => {
-                            state.source = (e.target as HTMLTextAreaElement).value;
-                        }}
-                    />
-                </section>
+                {state.editor ? (
+                    <section class="pane pane-editor">
+                        <h2>Editor</h2>
+                        <div class="body">
+                            {/* Two-way bound to the same source the panes on the right render. */}
+                            <MarkdownEditor
+                                id="editor"
+                                model:markdown={[state, 'source']}
+                                plugins={EDITOR_PLUGINS}
+                                components={{ mention: MentionChip }}
+                                placeholder="Write, or type / for blocks and @ to mention…"
+                            />
+                        </div>
+                    </section>
+                ) : (
+                    <section class="pane">
+                        <h2>Source</h2>
+                        <textarea
+                            data-testid="source"
+                            aria-label="Markdown source"
+                            spellCheck={false}
+                            value={state.source}
+                            onInput={(e) => {
+                                state.source = (e.target as HTMLTextAreaElement).value;
+                            }}
+                        />
+                    </section>
+                )}
 
                 <section class="pane">
                     <h2>View</h2>

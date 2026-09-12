@@ -145,8 +145,7 @@ export function toFlat(nodes: readonly PhrasingContent[], opts?: InlineFlatOptio
 export function mergeAdjacent(spans: readonly InlineSpan[], text: string): InlineSpan[] {
     const out: InlineSpan[] = [];
     for (const s of normalizeSpans(spans)) {
-        const isAtom = s.end - s.start === 1 && text[s.start] === ATOM_CHAR;
-        const prev = isAtom ? undefined : out.find((p) => p.type === s.type && p.end >= s.start && sameAttrs(p.attrs, s.attrs) && !(p.end - p.start === 1 && text[p.start] === ATOM_CHAR));
+        const prev = looksLikeAtom(s, text) ? undefined : out.find((p) => p.type === s.type && p.end >= s.start && sameAttrs(p.attrs, s.attrs) && !looksLikeAtom(p, text));
         if (prev) {
             prev.end = Math.max(prev.end, s.end);
             continue;
@@ -284,6 +283,11 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
     return root;
 }
 
+/** Without a kind registry: a one-char span over U+FFFC is an atom unless its type is a built-in mark (a mark may cover exactly one atom). */
+function looksLikeAtom(span: InlineSpan, text: string): boolean {
+    return span.end - span.start === 1 && text[span.start] === ATOM_CHAR && !BUILTIN_MARKS.has(span.type);
+}
+
 function isAtomSpan(span: InlineSpan, opts?: InlineFlatOptions): boolean {
     if (BUILTIN_ATOMS.has(span.type)) return true;
     const spec = opts?.kinds?.get(span.type);
@@ -412,7 +416,7 @@ export function concatFlat(a: InlineFlat, b: InlineFlat): InlineFlat {
 export function marksAt(flat: InlineFlat, start: number, end = start): string[] {
     const types = new Set<string>();
     for (const s of flat.spans) {
-        if (s.end - s.start === 1 && flat.text[s.start] === ATOM_CHAR) continue;
+        if (looksLikeAtom(s, flat.text)) continue;
         const covers = start === end ? s.start < start && s.end >= start : s.start <= start && s.end >= end;
         if (covers) types.add(s.type);
     }
