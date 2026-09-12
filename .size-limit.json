@@ -2,7 +2,20 @@
   {
     "name": "@sigx/markdown",
     "path": "packages/markdown/dist/index.prod.js",
-    "limit": "14 KB",
-    "ignore": ["@sigx/reactivity", "@sigx/runtime-core"]
+    "limit": "20 KB",
+    "ignore": [
+      "@sigx/reactivity",
+      "@sigx/runtime-core"
+    ]
+  },
+  {
+    "name": "@sigx/markdown/testing",
+    "path": "packages/markdown/dist/testing.prod.js",
+    "limit": "6 KB",
+    "ignore": [
+      "@sigx/markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core"
+    ]
   }
 ]

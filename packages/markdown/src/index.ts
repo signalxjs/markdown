@@ -8,5 +8,10 @@
  * this entry runs on the web, on Lynx and in the terminal alike.
  */
 
-/** The JSON document format version `toJSON()` writes and `fromJSON()` accepts. */
-export const CURRENT_VERSION = 1;
+export * from './ast/index.js';
+export * from './plugin/index.js';
+export * from './parser/index.js';
+export * from './serializer/index.js';
+export * from './render/index.js';
+export * from './stream/index.js';
+export * from './plugins/index.js';

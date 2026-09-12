@@ -12,7 +12,8 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "paths": {
-      "@sigx/markdown": ["./packages/markdown/src/index.ts"]
+      "@sigx/markdown": ["./packages/markdown/src/index.ts"],
+      "@sigx/markdown/testing": ["./packages/markdown/src/testing/index.ts"]
     }
   },
   "include": [

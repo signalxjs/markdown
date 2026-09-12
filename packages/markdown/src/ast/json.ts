@@ -1,0 +1,114 @@
+/**
+ * The save-friendly document format: the mdast `Root` itself, as plain JSON,
+ * with `data.version` for forward compatibility.
+ *
+ * `toJSON()` deep-clones and strips what is transient (reconciliation keys,
+ * the streaming `open` flag, and — by default — positions); `fromJSON()`
+ * validates the shape and version and re-assigns keys so the tree is ready to
+ * render or edit.
+ */
+
+import { assignKeys } from './keys.js';
+import type { Node, Root, RootData } from './nodes.js';
+
+/** The JSON document format version `toJSON()` writes. */
+export const CURRENT_VERSION = 1;
+
+/** A `Root` whose `data.version` is set — what `toJSON()` returns. */
+export interface MarkdownDocument extends Root {
+    data: RootData & { version: number };
+}
+
+export type MarkdownFormatErrorCode = 'invalid-shape' | 'unsupported-version';
+
+export class MarkdownFormatError extends Error {
+    readonly code: MarkdownFormatErrorCode;
+    constructor(code: MarkdownFormatErrorCode, message: string) {
+        super(message);
+        this.name = 'MarkdownFormatError';
+        this.code = code;
+    }
+}
+
+export interface ToJSONOptions {
+    /** Keep `position` on every node. Default `false`. */
+    position?: boolean;
+}
+
+/** Serialize a tree to the JSON document format (a deep clone; the input is untouched). */
+export function toJSON(root: Root, options?: ToJSONOptions): MarkdownDocument {
+    const keepPosition = options?.position === true;
+    const clone = (node: Node): Node => {
+        const out: Record<string, unknown> = {};
+        for (const key of Object.keys(node)) {
+            if (key === 'key' || key === 'open') continue;
+            if (key === 'position' && !keepPosition) continue;
+            const value = (node as unknown as Record<string, unknown>)[key];
+            if (key === 'children' && Array.isArray(value)) {
+                out.children = value.map((c) => clone(c as Node));
+            } else {
+                out[key] = cloneValue(value);
+            }
+        }
+        return out as unknown as Node;
+    };
+    const doc = clone(root) as MarkdownDocument;
+    doc.data = { ...doc.data, version: CURRENT_VERSION };
+    return doc;
+}
+
+function cloneValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(cloneValue);
+    if (value && typeof value === 'object') {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = cloneValue(v);
+        return out;
+    }
+    return value;
+}
+
+/**
+ * Parse the JSON document format back into a keyed `Root`. Accepts the parsed
+ * object (or a JSON string). Throws `MarkdownFormatError` on a wrong shape or
+ * a version newer than this package understands.
+ */
+export function fromJSON(input: unknown): Root {
+    const json = typeof input === 'string' ? JSON.parse(input) : input;
+    if (!isRecord(json) || json.type !== 'root' || !Array.isArray(json.children)) {
+        throw new MarkdownFormatError('invalid-shape', 'Expected a root node with a children array.');
+    }
+    const version = isRecord(json.data) ? json.data.version : undefined;
+    if (version !== undefined) {
+        if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+            throw new MarkdownFormatError('invalid-shape', `Invalid document version: ${String(version)}.`);
+        }
+        if (version > CURRENT_VERSION) {
+            throw new MarkdownFormatError(
+                'unsupported-version',
+                `Document version ${version} is newer than the supported version ${CURRENT_VERSION}.`,
+            );
+        }
+    }
+    validateNodes(json.children, 'children');
+    const root = cloneValue(json) as Root;
+    return assignKeys(root);
+}
+
+function validateNodes(nodes: unknown[], path: string): void {
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (!isRecord(node) || typeof node.type !== 'string') {
+            throw new MarkdownFormatError('invalid-shape', `Node at ${path}[${i}] has no string type.`);
+        }
+        if (node.children !== undefined) {
+            if (!Array.isArray(node.children)) {
+                throw new MarkdownFormatError('invalid-shape', `Node at ${path}[${i}] has non-array children.`);
+            }
+            validateNodes(node.children, `${path}[${i}].children`);
+        }
+    }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}

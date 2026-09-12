@@ -11,7 +11,8 @@ import type { ConfigEnv, UserConfig } from 'vite';
 // and `ENTRIES` in `scripts/verify-pack.js` (see AGENTS.md "Packages").
 const base = defineLibConfig({
     entry: {
-        index: 'src/index.ts'
+        index: 'src/index.ts',
+        testing: 'src/testing/index.ts'
     },
     external: [/@sigx\/.*/, /^shiki/, /^node:/],
     // Shipped components target the runtime directly, never the `sigx`

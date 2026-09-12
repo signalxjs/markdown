@@ -37,6 +37,7 @@ const PACKAGES = ['packages/markdown'];
 /** Every runtime entry the tarballs expose, imported one by one. */
 const ENTRIES = [
     '@sigx/markdown',
+    '@sigx/markdown/testing',
 ];
 
 const sandbox = join(tmpdir(), `sigx-markdown-verify-pack-${Date.now()}`);

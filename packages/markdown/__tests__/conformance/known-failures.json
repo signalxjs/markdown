@@ -1,0 +1,5 @@
+{
+  "$comment": "Examples that are EXPECTED to fail; the suite fails when one of them starts passing, so the list can only shrink. Raw HTML is out of scope (rendered as literal text): 21, 31, 201, 308, 309, 344, 475, 476, 477, 491, 494, 524, 536, 642, 643. HTML5-only entity names (the table is the HTML 4 set): 25. GFM autolink literals are on, CommonMark alone has none: 608, 611, 612. References are emitted whether or not a definition exists and resolve at render time (documented deviation from remark): 523, 533, 545, 569, 571.",
+  "commonmark": [21, 25, 31, 201, 308, 309, 344, 475, 476, 477, 491, 494, 523, 524, 533, 536, 545, 569, 571, 608, 611, 612, 642, 643],
+  "gfm": []
+}

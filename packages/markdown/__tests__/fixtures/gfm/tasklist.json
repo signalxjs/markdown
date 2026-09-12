@@ -1,0 +1,32 @@
+[
+    {
+        "example": 16,
+        "section": "Task list items",
+        "markdown": "- [ ] foo\n- [x] bar\n",
+        "html": "<ul>\n<li><input disabled=\"\" type=\"checkbox\"> foo</li>\n<li><input checked=\"\" disabled=\"\" type=\"checkbox\"> bar</li>\n</ul>\n"
+    },
+    {
+        "example": 17,
+        "section": "Task list items",
+        "markdown": "- [x] foo\n  - [ ] bar\n  - [x] baz\n- [ ] bim\n",
+        "html": "<ul>\n<li><input checked=\"\" disabled=\"\" type=\"checkbox\"> foo\n<ul>\n<li><input disabled=\"\" type=\"checkbox\"> bar</li>\n<li><input checked=\"\" disabled=\"\" type=\"checkbox\"> baz</li>\n</ul>\n</li>\n<li><input disabled=\"\" type=\"checkbox\"> bim</li>\n</ul>\n"
+    },
+    {
+        "example": 18,
+        "section": "Task list items",
+        "markdown": "- [X] upper\n",
+        "html": "<ul>\n<li><input checked=\"\" disabled=\"\" type=\"checkbox\"> upper</li>\n</ul>\n"
+    },
+    {
+        "example": 19,
+        "section": "Task list items",
+        "markdown": "- [ ]x not a task\n- [x]y not a task\n",
+        "html": "<ul>\n<li>[ ]x not a task</li>\n<li>[x]y not a task</li>\n</ul>\n"
+    },
+    {
+        "example": 20,
+        "section": "Task list items",
+        "markdown": "1. [ ] one\n\n2. [x] two\n",
+        "html": "<ol>\n<li>\n<p><input disabled=\"\" type=\"checkbox\"> one</p>\n</li>\n<li>\n<p><input checked=\"\" disabled=\"\" type=\"checkbox\"> two</p>\n</li>\n</ol>\n"
+    }
+]

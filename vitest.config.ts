@@ -34,6 +34,7 @@ export default defineConfig({
         // Subpaths before the bare name: vitest matches aliases in order and a
         // bare `@sigx/markdown` entry first would swallow `@sigx/markdown/dom`.
         alias: [
+            { find: '@sigx/markdown/testing', replacement: resolve(__dirname, 'packages/markdown/src/testing/index.ts') },
             { find: /^@sigx\/markdown$/, replacement: resolve(__dirname, 'packages/markdown/src/index.ts') }
         ]
     }
