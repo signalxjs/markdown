@@ -31,6 +31,46 @@ describe('FakeInlineSurface passes the surface conformance suite', () => {
     });
 });
 
+describe('FakeInlineSurface driver', () => {
+    const make = (text: string, readOnly = false, change: (e: { flat: { text: string } }) => void = () => undefined) =>
+        createFakeInlineSurface({
+            key: 'b-0',
+            blockType: 'paragraph',
+            attrs: {},
+            flat: { text, spans: [] },
+            readOnly,
+            events: { change, selection: () => undefined, boundary: () => true, paste: () => true, focus: () => undefined, blur: () => undefined, compositionStart: () => undefined, compositionEnd: () => undefined },
+        });
+
+    it('deleteRange respects readOnly like type does', () => {
+        const changes: string[] = [];
+        const s = make('abc', true, (e) => changes.push(e.flat.text));
+        s.focus({ offset: 3 });
+        s.deleteRange(2, 3);
+        s.type('X');
+        expect(s.getFlat().text).toBe('abc');
+        expect(changes).toEqual([]);
+        s.setReadOnly(false);
+        s.deleteRange(2, 3);
+        expect(s.getFlat().text).toBe('ab');
+        expect(changes).toEqual(['ab']);
+    });
+
+    it('compose shows each provisional update through getFlat/getSelection/isComposing while it is emitted', () => {
+        const seen: Array<{ text: string; sel: { start: number; end: number } | null; composing: boolean }> = [];
+        const s = make('a', false, () => seen.push({ text: s.getFlat().text, sel: s.getSelection(), composing: s.isComposing() }));
+        s.focus({ offset: 1 });
+        s.compose(['k', 'ka'], 'か');
+        expect(seen).toEqual([
+            { text: 'ak', sel: { start: 2, end: 2 }, composing: true },
+            { text: 'aka', sel: { start: 3, end: 3 }, composing: true },
+        ]);
+        expect(s.getFlat().text).toBe('aか');
+        expect(s.getSelection()).toEqual({ start: 2, end: 2 });
+        expect(s.isComposing()).toBe(false);
+    });
+});
+
 describe('runInlineSurfaceConformance tears down every surface it creates', () => {
     it('calls cleanup once per created surface, also when compose is unsupported or an assertion fails', async () => {
         let created = 0;

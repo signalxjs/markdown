@@ -120,6 +120,7 @@ export function createFakeInlineSurface(init: InlineSurfaceInit): FakeInlineSurf
             init.events.change({ flat, selection, composing, replaced: { from: start, to: end, insert: { text, spans: [] } } });
         },
         deleteRange(from, to) {
+            if (readOnly) return;
             flat = spliceFlat(flat, from, to, { text: '', spans: [] });
             selection = { start: from, end: from };
             init.events.change({ flat, selection, composing, replaced: { from, to, insert: { text: '', spans: [] } } });
@@ -129,14 +130,17 @@ export function createFakeInlineSurface(init: InlineSurfaceInit): FakeInlineSurf
         },
         compose(updates, committed) {
             const { start, end } = sel();
+            const base = flat;
             composing = true;
             init.events.compositionStart();
-            let cur = flat;
+            // Like a real surface, show each provisional update before reporting it, so
+            // getFlat()/getSelection() read the provisional state from inside a handler.
             for (const u of updates) {
-                cur = spliceFlat(flat, start, end, { text: u, spans: [] });
-                init.events.change({ flat: cur, selection: { start: start + u.length, end: start + u.length }, composing: true });
+                flat = spliceFlat(base, start, end, { text: u, spans: [] });
+                selection = { start: start + u.length, end: start + u.length };
+                init.events.change({ flat, selection, composing: true });
             }
-            flat = spliceFlat(flat, start, end, { text: committed, spans: [] });
+            flat = spliceFlat(base, start, end, { text: committed, spans: [] });
             selection = { start: start + committed.length, end: start + committed.length };
             composing = false;
             init.events.compositionEnd(flat);
