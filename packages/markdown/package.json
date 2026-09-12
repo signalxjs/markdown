@@ -30,6 +30,12 @@
             "production": "./dist/editor.prod.js",
             "import": "./dist/editor.js"
         },
+        "./editor/dom": {
+            "types": "./dist/editor/dom/index.d.ts",
+            "development": "./dist/editor/dom.js",
+            "production": "./dist/editor/dom.prod.js",
+            "import": "./dist/editor/dom.js"
+        },
         "./testing": {
             "types": "./dist/testing/index.d.ts",
             "development": "./dist/testing.js",

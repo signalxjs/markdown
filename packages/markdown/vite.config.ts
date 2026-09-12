@@ -15,6 +15,7 @@ const base = defineLibConfig({
         dom: 'src/dom/index.ts',
         shiki: 'src/shiki/index.ts',
         editor: 'src/editor/index.ts',
+        'editor/dom': 'src/editor/dom/index.ts',
         testing: 'src/testing/index.ts'
     },
     external: [/@sigx\/.*/, /^shiki/, /^node:/],

@@ -174,6 +174,10 @@ export function createCodeBridge(key: string, host: BridgeHost): CodeBridge {
             host.setSelection(sel(e.range, lengthOf()));
             return host.runKey(e.key);
         },
+        keydown: (name, range) => {
+            host.setSelection(textSelection(key, range.start, range.end));
+            return host.runKey(name);
+        },
         langChange: (lang) => host.dispatch({ steps: [{ type: 'setAttrs', key, attrs: { lang } }], meta: { origin: 'surface', sourceKey: key } }),
         focus: () => host.focused(key),
         blur: () => host.focused(null),

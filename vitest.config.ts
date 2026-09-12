@@ -36,6 +36,7 @@ export default defineConfig({
         alias: [
             { find: '@sigx/markdown/dom', replacement: resolve(__dirname, 'packages/markdown/src/dom/index.ts') },
             { find: '@sigx/markdown/shiki', replacement: resolve(__dirname, 'packages/markdown/src/shiki/index.ts') },
+            { find: '@sigx/markdown/editor/dom', replacement: resolve(__dirname, 'packages/markdown/src/editor/dom/index.ts') },
             { find: '@sigx/markdown/editor', replacement: resolve(__dirname, 'packages/markdown/src/editor/index.ts') },
             { find: '@sigx/markdown/testing', replacement: resolve(__dirname, 'packages/markdown/src/testing/index.ts') },
             { find: /^@sigx\/markdown$/, replacement: resolve(__dirname, 'packages/markdown/src/index.ts') }

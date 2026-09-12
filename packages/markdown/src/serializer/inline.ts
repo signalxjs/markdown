@@ -137,6 +137,10 @@ export function serializeInline(
             const before = edgeBefore(parts, i, outer);
             const after = edgeAfter(parts, i, outer);
             parts[i] = wrapEmphasis(content, ch, before, after);
+        } else if (children[i].type === 'text' && parts[i].endsWith('\\!') && !parts[i].endsWith('\\\\!') && edgeAfter(parts, i, outer) !== '[') {
+            // `escapeText` escapes a run-final "!" defensively (the next node
+            // might supply the "["); with the neighbour known, keep it bare.
+            parts[i] = parts[i].slice(0, -2) + '!';
         } else if (i > 0 && parts[i][0] === '(' && isShortcutReference(children[i - 1]) && parts[i - 1].endsWith(']')) {
             // `[ref]` followed by `(`… would become an inline link.
             parts[i] = '\\' + parts[i];

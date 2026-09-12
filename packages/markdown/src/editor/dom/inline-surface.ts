@@ -357,7 +357,10 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
         host,
         key: init.key,
         setInline(flat) {
-            if (flatEquals(flat, known) && flatEquals(flat, readInline(host))) return;
+            // Compare with what the core knows, never with the live DOM: between
+            // the browser's mutation and our `input` event a selection-only
+            // transaction may push the (unchanged) content back.
+            if (flatEquals(flat, known)) return;
             const focused = d.activeElement === host || host.contains(d.activeElement);
             const range = focused ? currentRange() : null;
             known = flat;

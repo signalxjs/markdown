@@ -109,6 +109,13 @@ describe('toMarkdown — root and paragraphs', () => {
         expect(md(p('a *b* c\n- not a list'))).toBe('a \\*b\\* c\n\\- not a list\n');
     });
 
+    it('escapes a trailing "!" only when the next node starts with "["', () => {
+        expect(md(p('hello!'))).toBe('hello!\n');
+        expect(md({ type: 'paragraph', children: [{ type: 'text', value: 'a!' }, { type: 'link', url: 'u', children: [{ type: 'text', value: 'b' }] }] })).toBe('a\\![b](u)\n');
+        expect(md({ type: 'paragraph', children: [{ type: 'text', value: 'a!' }, { type: 'text', value: '[b]' }] })).toBe('a!\\[b\\]\n');
+        expect(md({ type: 'paragraph', children: [{ type: 'text', value: 'a!' }, { type: 'emphasis', children: [{ type: 'text', value: 'b' }] }] })).toBe('a!*b*\n');
+    });
+
     it('serializes a hard break as backslash + newline', () => {
         expect(md(p('a', br(), 'b'))).toBe('a\\\nb\n');
     });

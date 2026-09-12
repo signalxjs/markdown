@@ -114,6 +114,8 @@ export interface CodeSurfaceEvents {
     selection(e: SurfaceSelectionEvent): void;
     /** `Backspace` only when the value is empty; `ArrowUp`/`ArrowDown` only on the first/last line. */
     boundary(e: SurfaceBoundaryEvent): boolean;
+    /** Any other key the platform can report (chords such as `Mod-z`). Returns whether the core consumed it. */
+    keydown?(name: string, range: Range): boolean;
     langChange?(lang: string | null): void;
     focus(): void;
     blur(): void;
