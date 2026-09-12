@@ -47,5 +47,19 @@ workspace shares one version line.
     `mentionPlugin` (`@[label](id)`) as the reference plugin.
 - `@sigx/markdown/testing` entry: `strip()`, `stripPositions()`, `toHtml()`
   (spec-conformance HTML), `feed()` and `seededChunks()` for streaming tests.
+- `@sigx/markdown/dom` entry (#9): `MarkdownView` on `@sigx/runtime-core` +
+  `@sigx/runtime-dom` — one incremental engine per instance so a growing
+  `value` re-renders only the live block; props `value | root`, `plugins`,
+  `components`, `onLink(url, node, event)`, `linkTarget`, `sanitizeUrl`,
+  `classPrefix`, `copyButton`, plus host attributes on the root. Default DOM
+  components styled through `data-scope="markdown"` / `data-part` attributes
+  (no classes unless `classPrefix`), `CodeBlock` chrome with a language label
+  and a clipboard copy button, `html` nodes rendered as text.
+- `@sigx/markdown/shiki` entry (#9): `createShikiHighlighter()` (lazy
+  `import('shiki')`, `shiki >=3.7.0` optional peer, LRU token cache, dual
+  light/dark themes) and `shikiCodeBlock()` — a `code` component whose instance
+  survives streaming, highlighting debounced while a fence is open.
+- `examples/playground`: a Vite app exercising the view, streaming, plugins,
+  Shiki and the serializer, with a Playwright e2e suite run in CI.
 - Repo scaffold: `packages/markdown` (`@sigx/markdown`) with the sigx standard
   build, test, catalog and release setup.

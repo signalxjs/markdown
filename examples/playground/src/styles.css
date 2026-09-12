@@ -1,0 +1,340 @@
+/*
+ * Reference stylesheet for @sigx/markdown's DOM view.
+ *
+ * The package ships no CSS: every element the default components render
+ * carries `data-scope="markdown"` and `data-part="<name>"` (and, with
+ * `classPrefix="md"`, an `md-<name>` class), so a stylesheet targets
+ * `[data-scope=markdown][data-part=…]` and nothing else. This file is the
+ * one the docs point to — copy it, or take what you need.
+ *
+ * Theming: tokens on `:root`; dark values under `[data-theme="dark"]` and,
+ * when nothing is stamped, under `prefers-color-scheme`. Shiki tokens are
+ * emitted in dual-theme mode (`color` = light, `--shiki-dark` = dark), so
+ * dark mode is one rule that switches the colour source.
+ */
+
+:root {
+    --md-fg: #1f2328;
+    --md-muted: #59636e;
+    --md-bg: #ffffff;
+    --md-surface: #f6f8fa;
+    --md-border: #d1d9e0;
+    --md-accent: #0969da;
+    --md-code-bg: #f6f8fa;
+    --md-code-fg: #1f2328;
+    --md-quote-border: #d1d9e0;
+    --md-mention-bg: #ddf4ff;
+    --md-mention-fg: #0969da;
+    --md-radius: 6px;
+}
+
+:root[data-theme='dark'] {
+    --md-fg: #e6edf3;
+    --md-muted: #8d96a0;
+    --md-bg: #0d1117;
+    --md-surface: #161b22;
+    --md-border: #30363d;
+    --md-accent: #4493f8;
+    --md-code-bg: #161b22;
+    --md-code-fg: #e6edf3;
+    --md-quote-border: #3d444d;
+    --md-mention-bg: #122d4a;
+    --md-mention-fg: #79c0ff;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        --md-fg: #e6edf3;
+        --md-muted: #8d96a0;
+        --md-bg: #0d1117;
+        --md-surface: #161b22;
+        --md-border: #30363d;
+        --md-accent: #4493f8;
+        --md-code-bg: #161b22;
+        --md-code-fg: #e6edf3;
+        --md-quote-border: #3d444d;
+        --md-mention-bg: #122d4a;
+        --md-mention-fg: #79c0ff;
+    }
+}
+
+/* ---- Root & typography ---------------------------------------------- */
+
+[data-scope='markdown'][data-part='root'] {
+    color: var(--md-fg);
+    font-size: 1rem;
+    line-height: 1.6;
+    overflow-wrap: break-word;
+}
+
+[data-scope='markdown'][data-part='root'] > :first-child {
+    margin-top: 0;
+}
+
+[data-scope='markdown'][data-part='root'] > :last-child {
+    margin-bottom: 0;
+}
+
+[data-scope='markdown'][data-part='paragraph'] {
+    margin: 0 0 1em;
+}
+
+[data-scope='markdown'][data-part='heading'] {
+    margin: 1.5em 0 0.6em;
+    line-height: 1.25;
+    font-weight: 600;
+}
+
+[data-scope='markdown'][data-part='heading'][data-depth='1'] {
+    font-size: 2em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--md-border);
+}
+
+[data-scope='markdown'][data-part='heading'][data-depth='2'] {
+    font-size: 1.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--md-border);
+}
+
+[data-scope='markdown'][data-part='heading'][data-depth='3'] {
+    font-size: 1.25em;
+}
+
+[data-scope='markdown'][data-part='heading'][data-depth='4'] {
+    font-size: 1em;
+}
+
+[data-scope='markdown'][data-part='heading'][data-depth='5'] {
+    font-size: 0.875em;
+}
+
+[data-scope='markdown'][data-part='heading'][data-depth='6'] {
+    font-size: 0.85em;
+    color: var(--md-muted);
+}
+
+[data-scope='markdown'][data-part='strong'] {
+    font-weight: 600;
+}
+
+[data-scope='markdown'][data-part='delete'] {
+    text-decoration: line-through;
+    color: var(--md-muted);
+}
+
+[data-scope='markdown'][data-part='link'] {
+    color: var(--md-accent);
+    text-decoration: none;
+}
+
+[data-scope='markdown'][data-part='link']:hover {
+    text-decoration: underline;
+}
+
+[data-scope='markdown'][data-part='inline-code'] {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.875em;
+    padding: 0.15em 0.35em;
+    border-radius: var(--md-radius);
+    background: var(--md-code-bg);
+    color: var(--md-code-fg);
+}
+
+[data-scope='markdown'][data-part='image'] {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--md-radius);
+}
+
+[data-scope='markdown'][data-part='thematic-break'] {
+    height: 1px;
+    margin: 1.5em 0;
+    border: 0;
+    background: var(--md-border);
+}
+
+/* ---- Blockquote ------------------------------------------------------ */
+
+[data-scope='markdown'][data-part='blockquote'] {
+    margin: 0 0 1em;
+    padding: 0.1em 1em;
+    color: var(--md-muted);
+    border-left: 0.25em solid var(--md-quote-border);
+}
+
+/* ---- Lists & tasks --------------------------------------------------- */
+
+[data-scope='markdown'][data-part='list'] {
+    margin: 0 0 1em;
+    padding-left: 2em;
+}
+
+[data-scope='markdown'][data-part='list'] [data-scope='markdown'][data-part='list'] {
+    margin-bottom: 0;
+}
+
+[data-scope='markdown'][data-part='list-item'] {
+    margin: 0.25em 0;
+}
+
+[data-scope='markdown'][data-part='list-item'] > [data-scope='markdown'][data-part='paragraph'] {
+    margin-bottom: 0.25em;
+}
+
+/* Task items: hide the marker, put the checkbox where it was. */
+[data-scope='markdown'][data-part='list-item'][data-task] {
+    list-style: none;
+    margin-left: -1.5em;
+}
+
+[data-scope='markdown'][data-part='checkbox'] {
+    margin: 0 0.5em 0 0;
+    vertical-align: -0.1em;
+    accent-color: var(--md-accent);
+}
+
+[data-scope='markdown'][data-part='list-item'][data-task][data-checked] {
+    color: var(--md-muted);
+}
+
+/* ---- Code blocks ----------------------------------------------------- */
+
+[data-scope='markdown'][data-part='code'] {
+    margin: 0 0 1em;
+    border: 1px solid var(--md-border);
+    border-radius: var(--md-radius);
+    background: var(--md-code-bg);
+    color: var(--md-code-fg);
+    overflow: hidden;
+}
+
+/* A fence still being streamed (no closing ```): a live indicator. */
+[data-scope='markdown'][data-part='code'][data-open] {
+    border-style: dashed;
+}
+
+[data-scope='markdown'][data-part='code-header'] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.3em 0.75em;
+    font-size: 0.75em;
+    color: var(--md-muted);
+    border-bottom: 1px solid var(--md-border);
+    background: var(--md-surface);
+}
+
+[data-scope='markdown'][data-part='code-lang'] {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-transform: lowercase;
+}
+
+[data-scope='markdown'][data-part='copy'] {
+    font: inherit;
+    padding: 0.2em 0.6em;
+    border: 1px solid var(--md-border);
+    border-radius: var(--md-radius);
+    background: var(--md-bg);
+    color: var(--md-fg);
+    cursor: pointer;
+}
+
+[data-scope='markdown'][data-part='copy']:hover {
+    border-color: var(--md-accent);
+    color: var(--md-accent);
+}
+
+[data-scope='markdown'][data-part='code'][data-copied] [data-part='copy'] {
+    border-color: var(--md-accent);
+    color: var(--md-accent);
+}
+
+[data-scope='markdown'][data-part='pre'] {
+    margin: 0;
+    padding: 0.75em 1em;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.875em;
+    line-height: 1.5;
+    tab-size: 4;
+}
+
+[data-scope='markdown'][data-part='code-body'] {
+    font: inherit;
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+
+/* Shiki output: one <span data-line> per line, <span style="color:…"> tokens. */
+[data-scope='markdown'][data-part='code-body'] span[data-line] {
+    display: block;
+    min-height: 1.5em;
+}
+
+/* Dual-theme tokens: dark mode reads the `--shiki-dark` variable instead of `color`. */
+:root[data-theme='dark'] [data-scope='markdown'][data-part='code-body'] span[style*='--shiki-dark'] {
+    color: var(--shiki-dark);
+    font-style: var(--shiki-dark-font-style, inherit);
+    font-weight: var(--shiki-dark-font-weight, inherit);
+    text-decoration: var(--shiki-dark-text-decoration, inherit);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) [data-scope='markdown'][data-part='code-body'] span[style*='--shiki-dark'] {
+        color: var(--shiki-dark);
+        font-style: var(--shiki-dark-font-style, inherit);
+        font-weight: var(--shiki-dark-font-weight, inherit);
+        text-decoration: var(--shiki-dark-text-decoration, inherit);
+    }
+}
+
+/* ---- Tables ---------------------------------------------------------- */
+
+[data-scope='markdown'][data-part='table'] {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 0 0 1em;
+    border-spacing: 0;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+
+[data-scope='markdown'][data-part='table-cell'] {
+    padding: 0.4em 0.8em;
+    border: 1px solid var(--md-border);
+    text-align: left;
+}
+
+[data-scope='markdown'][data-part='table-row'][data-header] [data-part='table-cell'] {
+    font-weight: 600;
+    background: var(--md-surface);
+}
+
+[data-scope='markdown'][data-part='table-body'] [data-part='table-row']:nth-child(even) {
+    background: color-mix(in srgb, var(--md-surface) 60%, var(--md-bg));
+}
+
+[data-scope='markdown'][data-part='table-cell'][data-align='center'] {
+    text-align: center;
+}
+
+[data-scope='markdown'][data-part='table-cell'][data-align='right'] {
+    text-align: right;
+}
+
+/* ---- Plugin nodes ---------------------------------------------------- */
+
+/* The mention plugin's `mention` slot (rendered by the app, see App.tsx). */
+[data-scope='markdown'][data-part='mention'] {
+    display: inline-block;
+    padding: 0 0.4em;
+    border-radius: 999px;
+    background: var(--md-mention-bg);
+    color: var(--md-mention-fg);
+    font-weight: 500;
+    line-height: 1.4;
+}

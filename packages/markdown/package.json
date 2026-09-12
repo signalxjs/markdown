@@ -12,6 +12,18 @@
             "production": "./dist/index.prod.js",
             "import": "./dist/index.js"
         },
+        "./dom": {
+            "types": "./dist/dom/index.d.ts",
+            "development": "./dist/dom.js",
+            "production": "./dist/dom.prod.js",
+            "import": "./dist/dom.js"
+        },
+        "./shiki": {
+            "types": "./dist/shiki/index.d.ts",
+            "development": "./dist/shiki.js",
+            "production": "./dist/shiki.prod.js",
+            "import": "./dist/shiki.js"
+        },
         "./testing": {
             "types": "./dist/testing/index.d.ts",
             "development": "./dist/testing.js",
@@ -60,6 +72,7 @@
         "@sigx/server-renderer": "catalog:",
         "@sigx/vite": "catalog:",
         "@types/node": "^25.9.1",
+        "shiki": "^4.4.3",
         "sigx": "catalog:",
         "typescript": "^6.0.3",
         "vite": "^8.0.3"
@@ -69,6 +82,16 @@
     },
     "peerDependencies": {
         "@sigx/reactivity": "^0.15.0",
-        "@sigx/runtime-core": "^0.15.0"
+        "@sigx/runtime-core": "^0.15.0",
+        "@sigx/runtime-dom": "^0.15.0",
+        "shiki": ">=3.7.0"
+    },
+    "peerDependenciesMeta": {
+        "@sigx/runtime-dom": {
+            "optional": true
+        },
+        "shiki": {
+            "optional": true
+        }
     }
 }

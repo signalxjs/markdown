@@ -13,6 +13,8 @@
     "verbatimModuleSyntax": true,
     "paths": {
       "@sigx/markdown": ["./packages/markdown/src/index.ts"],
+      "@sigx/markdown/dom": ["./packages/markdown/src/dom/index.ts"],
+      "@sigx/markdown/shiki": ["./packages/markdown/src/shiki/index.ts"],
       "@sigx/markdown/testing": ["./packages/markdown/src/testing/index.ts"]
     }
   },

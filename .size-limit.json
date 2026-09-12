@@ -9,6 +9,29 @@
     ]
   },
   {
+    "name": "@sigx/markdown/dom",
+    "path": "packages/markdown/dist/dom.prod.js",
+    "limit": "6 KB",
+    "ignore": [
+      "@sigx/markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom"
+    ]
+  },
+  {
+    "name": "@sigx/markdown/shiki",
+    "path": "packages/markdown/dist/shiki.prod.js",
+    "limit": "4 KB",
+    "ignore": [
+      "@sigx/markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
     "name": "@sigx/markdown/testing",
     "path": "packages/markdown/dist/testing.prod.js",
     "limit": "6 KB",

@@ -37,6 +37,8 @@ const PACKAGES = ['packages/markdown'];
 /** Every runtime entry the tarballs expose, imported one by one. */
 const ENTRIES = [
     '@sigx/markdown',
+    '@sigx/markdown/dom',
+    '@sigx/markdown/shiki',
     '@sigx/markdown/testing',
 ];
 
@@ -111,7 +113,7 @@ function main() {
         scripts: { smoke: 'node smoke.mjs' },
         // The package peers on the sigx runtime; the scratch app owns the copy,
         // exactly as a consuming app does.
-        dependencies: { ...deps, '@sigx/reactivity': '^0.15.0', '@sigx/runtime-core': '^0.15.0' },
+        dependencies: { ...deps, '@sigx/reactivity': '^0.15.0', '@sigx/runtime-core': '^0.15.0', '@sigx/runtime-dom': '^0.15.0', shiki: '^4.0.2' },
     };
     writeFileSync(join(appDir, 'package.json'), JSON.stringify(appPkg, null, 2));
 

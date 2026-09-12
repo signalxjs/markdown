@@ -1,0 +1,320 @@
+/**
+ * The playground: a source pane, the DOM view with its toggles, a streamed
+ * copy of the view fed through `createMarkdownStream`, and the serializer
+ * output. One component, one reactive state object — the view re-renders
+ * only the block a keystroke touches.
+ */
+import { component, computed, type JSXElement } from 'sigx';
+import {
+    createMarkdownStream,
+    mentionPlugin,
+    parseMarkdown,
+    toJSON,
+    toMarkdown,
+    type MarkdownChild,
+    type MarkdownPlugin,
+    type Mention,
+    type NodeProps
+} from '@sigx/markdown';
+import { MarkdownView, type DomMarkdownComponents } from '@sigx/markdown/dom';
+
+// Register the mention node with the AST and type its component slot: this
+// is the consumer-side half of the plugin contract (the package does not do
+// it itself so a plain tree stays exactly mdast).
+declare module '@sigx/markdown' {
+    interface PhrasingContentMap {
+        mention: Mention;
+    }
+    interface MarkdownPluginComponents<E> {
+        mention(p: NodeProps<E, Mention>): MarkdownChild<E>;
+    }
+}
+
+const SAMPLE = `# @sigx/markdown playground
+
+Markdown for **SignalX** — an *incremental* parser that keeps finalized blocks
+stable while the source grows, a serializer, and a DOM view styled through
+\`data-part\` attributes. Read the [docs](https://sigx.dev/markdown/) or ping
+@[Andy](u1) with questions.
+
+## Lists
+
+- Blocks keep their identity while streaming
+- Inline: *emphasis*, **strong**, ~~strike~~, \`code\`, <https://sigx.dev>
+  - Nested items work too
+  - And a [relative link](/guide) that stays in the app
+- Images: ![SignalX](/signalx-logo-150x119.png)
+
+1. Parse
+2. Render
+3. Serialize
+
+### Tasks
+
+- [x] Parser
+- [x] DOM view
+- [ ] Editor
+
+## Code
+
+\`\`\`ts
+export function greet(name: string): string {
+    const now = new Date();
+    return \`Hello, \${name}! It is \${now.toLocaleTimeString()}.\`;
+}
+\`\`\`
+
+> A blockquote, with **strong** text inside it.
+> It spans two lines.
+
+## Table
+
+| Entry | Runs on | Notes |
+|:------|:-------:|------:|
+| \`.\` | everywhere | parser, serializer, engine |
+| \`./dom\` | web | \`MarkdownView\` |
+| \`./shiki\` | web | optional highlighting |
+
+---
+
+That's it. Edit the source on the left; hit **Stream** to replay it token by token.
+`;
+
+// Plugin arrays are captured by the view's incremental engine: keep both
+// identities stable (a new array re-creates the engine and re-parses).
+const NO_PLUGINS: readonly MarkdownPlugin[] = [];
+const WITH_MENTION: readonly MarkdownPlugin[] = [mentionPlugin];
+
+/** The `mention` slot: a plain function, called by the render engine with the node. */
+const MentionChip = ({ node }: NodeProps<JSXElement, Mention>): JSXElement => (
+    <span data-scope="markdown" data-part="mention" title={node.id}>
+        @{node.label}
+    </span>
+);
+
+type CodeSlot = DomMarkdownComponents['code'];
+
+export const App = component(({ signal, onUnmounted }) => {
+    const state = signal({
+        source: SAMPLE,
+        shiki: false,
+        shikiReady: false,
+        mention: true,
+        classPrefix: false,
+        dark: false,
+        charsPerTick: 3,
+        tickMs: 16,
+        streaming: false,
+        lastLink: ''
+    });
+
+    // ---- Shiki: loaded on first toggle so the initial bundle stays small ----
+    let shikiCode: CodeSlot | null = null;
+    let shikiLoading: Promise<void> | null = null;
+
+    const loadShiki = (): Promise<void> => {
+        shikiLoading ??= import('@sigx/markdown/shiki').then(({ createShikiHighlighter, shikiCodeBlock }) => {
+            shikiCode = shikiCodeBlock(createShikiHighlighter());
+            state.shikiReady = true;
+        });
+        return shikiLoading;
+    };
+
+    const toggleShiki = (): void => {
+        state.shiki = !state.shiki;
+        if (state.shiki) void loadShiki();
+    };
+
+    const toggleDark = (): void => {
+        state.dark = !state.dark;
+        document.documentElement.dataset.theme = state.dark ? 'dark' : 'light';
+    };
+
+    // ---- View inputs ----
+    const plugins = computed<readonly MarkdownPlugin[]>(() => (state.mention ? WITH_MENTION : NO_PLUGINS));
+
+    const components = computed<Partial<DomMarkdownComponents>>(() => {
+        const slots: Partial<DomMarkdownComponents> = { mention: MentionChip };
+        if (state.shiki && state.shikiReady && shikiCode) slots.code = shikiCode;
+        return slots;
+    });
+
+    const onLink = (url: string): void => {
+        state.lastLink = url;
+    };
+
+    // ---- Streaming: replay the source through createMarkdownStream ----
+    const stream = createMarkdownStream({ flushIntervalMs: 16 });
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const clearTimer = (): void => {
+        if (timer !== null) {
+            clearInterval(timer);
+            timer = null;
+        }
+    };
+
+    const finishStream = (): void => {
+        clearTimer();
+        stream.done();
+        state.streaming = false;
+    };
+
+    const startStream = (): void => {
+        clearTimer();
+        stream.reset();
+        const text = state.source;
+        const step = Math.max(1, Math.floor(state.charsPerTick) || 1);
+        const every = Math.max(1, Math.floor(state.tickMs) || 1);
+        let cursor = 0;
+        state.streaming = true;
+        timer = setInterval(() => {
+            const next = Math.min(text.length, cursor + step);
+            stream.append(text.slice(cursor, next));
+            cursor = next;
+            if (cursor >= text.length) finishStream();
+        }, every);
+    };
+
+    const streamStatus = computed(() => (state.streaming ? 'streaming' : stream.finished.value ? 'done' : 'idle'));
+
+    onUnmounted(clearTimer);
+
+    // ---- Serializer output ----
+    const root = computed(() => parseMarkdown(state.source, { plugins: plugins.value }));
+    const serializedMarkdown = computed(() => toMarkdown(root.value, { plugins: plugins.value }));
+    const serializedJson = computed(() => JSON.stringify(toJSON(root.value), null, 2));
+
+    const number = (e: Event): number => Number((e.target as HTMLInputElement).value);
+
+    return () => (
+        <div class="app">
+            <header class="toolbar">
+                <h1>@sigx/markdown</h1>
+                <label>
+                    <input type="checkbox" data-testid="toggle-shiki" checked={state.shiki} onChange={toggleShiki} />
+                    Shiki
+                </label>
+                <label>
+                    <input
+                        type="checkbox"
+                        data-testid="toggle-mention"
+                        checked={state.mention}
+                        onChange={() => {
+                            state.mention = !state.mention;
+                        }}
+                    />
+                    Mention plugin
+                </label>
+                <label>
+                    <input
+                        type="checkbox"
+                        data-testid="toggle-class-prefix"
+                        checked={state.classPrefix}
+                        onChange={() => {
+                            state.classPrefix = !state.classPrefix;
+                        }}
+                    />
+                    classPrefix
+                </label>
+                <label>
+                    <input type="checkbox" data-testid="toggle-dark" checked={state.dark} onChange={toggleDark} />
+                    Dark
+                </label>
+                <label>
+                    chars/tick
+                    <input
+                        type="number"
+                        min="1"
+                        data-testid="chars-per-tick"
+                        value={state.charsPerTick}
+                        onInput={(e) => {
+                            state.charsPerTick = number(e);
+                        }}
+                    />
+                </label>
+                <label>
+                    tick ms
+                    <input
+                        type="number"
+                        min="1"
+                        data-testid="tick-ms"
+                        value={state.tickMs}
+                        onInput={(e) => {
+                            state.tickMs = number(e);
+                        }}
+                    />
+                </label>
+                <button type="button" data-testid="stream-start" onClick={startStream}>
+                    Stream
+                </button>
+                <button type="button" data-testid="stream-stop" disabled={!state.streaming} onClick={finishStream}>
+                    {state.streaming ? 'Stop' : 'Done'}
+                </button>
+                <span class="status" data-testid="stream-status">
+                    {streamStatus.value}
+                </span>
+                <span class="last-link">
+                    last link: <span data-testid="last-link">{state.lastLink}</span>
+                </span>
+            </header>
+
+            <main class="panes">
+                <section class="pane">
+                    <h2>Source</h2>
+                    <textarea
+                        data-testid="source"
+                        aria-label="Markdown source"
+                        spellCheck={false}
+                        value={state.source}
+                        onInput={(e) => {
+                            state.source = (e.target as HTMLTextAreaElement).value;
+                        }}
+                    />
+                </section>
+
+                <section class="pane">
+                    <h2>View</h2>
+                    <div class="body">
+                        <MarkdownView
+                            id="static"
+                            value={state.source}
+                            plugins={plugins.value}
+                            components={components.value}
+                            onLink={onLink}
+                            classPrefix={state.classPrefix ? 'md' : undefined}
+                        />
+                    </div>
+                </section>
+
+                <section class="pane">
+                    <h2>Streamed</h2>
+                    <div class="body">
+                        <MarkdownView
+                            id="streamed"
+                            value={stream.value.value}
+                            plugins={plugins.value}
+                            components={components.value}
+                            onLink={onLink}
+                            classPrefix={state.classPrefix ? 'md' : undefined}
+                        />
+                    </div>
+                </section>
+
+                <section class="pane">
+                    <h2>Serialized</h2>
+                    <div class="body">
+                        <h3>toMarkdown(parseMarkdown(source))</h3>
+                        <pre class="out" data-testid="serialized-md">
+                            {serializedMarkdown.value}
+                        </pre>
+                        <h3>toJSON(parseMarkdown(source))</h3>
+                        <pre class="out" data-testid="serialized-json">
+                            {serializedJson.value}
+                        </pre>
+                    </div>
+                </section>
+            </main>
+        </div>
+    );
+});
