@@ -164,6 +164,12 @@ export function createState(doc: Root, selection: EditorSelection = null, option
  * empty list item or blockquote gets one empty paragraph (markdown cannot
  * express these, but a caret needs somewhere to live), and every block-level
  * node gets a key when any is missing. Returns the same object.
+ *
+ * Only *empty* containers are filled. A list item or blockquote that has
+ * content but no paragraph of its own (`- - a`, a quote holding one code
+ * block) is left as it is — the caret enters its first editable descendant
+ * (see `BlockEditorSpec.entry`), and inserting a paragraph there would
+ * rewrite the user's document on load.
  */
 export function normalizeDoc(doc: Root): Root {
     if (doc.children.length === 0) doc.children.push({ type: 'paragraph', children: [] });
