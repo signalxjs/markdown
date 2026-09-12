@@ -34,15 +34,17 @@ body:
     validations:
       required: false
 
-  # TODO(sigx-standard): list this repo's packages, or delete this dropdown for
-  # a single-package repo.
   - type: dropdown
     id: scope
     attributes:
       label: Which package(s) would this affect?
       multiple: true
       options:
-        - "@sigx/<package>"
+        - "@sigx/markdown"
+        - "@sigx/markdown/dom"
+        - "@sigx/markdown/shiki"
+        - "@sigx/markdown/editor"
+        - "@sigx/markdown/editor/dom"
         - Not sure
     validations:
       required: true

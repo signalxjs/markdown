@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "sigx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@sigx/markdown": ["./packages/markdown/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.tsx",
+    "packages/*/__tests__/**/*.ts",
+    "packages/*/__tests__/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "packages/*/dist",
+    "examples"
+  ]
+}
