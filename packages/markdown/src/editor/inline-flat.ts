@@ -114,6 +114,7 @@ export function toFlat(nodes: readonly PhrasingContent[], opts?: InlineFlatOptio
                     // nesting (outer first); `toInline` uses it to break extent ties.
                     const span: InlineSpan = { start: text.length, end: text.length, type: node.type };
                     const attrs = (opts?.kinds?.get(node.type)?.toFlat ?? defaultAttrs)(node);
+                    if (node.type === 'link' && (node as { data?: { autolink?: boolean } }).data?.autolink) attrs.autolink = 'true';
                     if (Object.keys(attrs).length) span.attrs = attrs;
                     spans.push(span);
                     walk((node as { children: PhrasingContent[] }).children);
@@ -238,6 +239,7 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
         if (span.type === 'link') {
             const node: PhrasingContent = { type: 'link', url: span.attrs?.url ?? '', children };
             if (span.attrs?.title !== undefined) (node as { title?: string }).title = span.attrs.title;
+            if (span.attrs?.autolink === 'true') (node as { data?: { autolink: boolean } }).data = { autolink: true };
             return node;
         }
         return { type: span.type, ...span.attrs, children } as unknown as PhrasingContent;

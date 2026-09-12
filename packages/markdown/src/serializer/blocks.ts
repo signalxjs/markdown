@@ -224,6 +224,13 @@ function serializeListItem(item: ListItem, state: State, marker: string, loose: 
         body = body === '' ? box : box + ' ' + body;
     }
     if (body === '') return marker;
+    // An empty first paragraph (an editor caret slot) followed by other blocks:
+    // the marker sits alone on its line and the rest is indented under it, so
+    // `-\n  - b` re-parses as an item holding a nested list, not as `- - b`.
+    const first = item.children?.[0];
+    if (first?.type === 'paragraph' && (first.children?.length ?? 0) === 0 && (item.children?.length ?? 0) > 1 && item.checked !== true && item.checked !== false) {
+        return marker + '\n' + indent + indentLines(body, indent);
+    }
     return marker + ' ' + indentLines(body, indent);
 }
 

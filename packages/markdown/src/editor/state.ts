@@ -154,10 +154,31 @@ export interface CreateStateOptions {
     editableTypes?: ReadonlySet<string>;
 }
 
-/** Build a state around a document. Keys are assigned when missing (a remark tree, a hand-built one). */
+/** Build a state around a document. The document is normalised in place (see `normalizeDoc`). */
 export function createState(doc: Root, selection: EditorSelection = null, options?: CreateStateOptions): EditorState {
+    return makeState(normalizeDoc(doc), selection, 0, false, options?.editableTypes);
+}
+
+/**
+ * Make a document editable, in place: an empty root gets one paragraph, an
+ * empty list item or blockquote gets one empty paragraph (markdown cannot
+ * express these, but a caret needs somewhere to live), and every block-level
+ * node gets a key when any is missing. Returns the same object.
+ */
+export function normalizeDoc(doc: Root): Root {
+    if (doc.children.length === 0) doc.children.push({ type: 'paragraph', children: [] });
+    const fill = (node: EditorBlock): void => {
+        if (!isContainerType(node.type)) return;
+        const container = node as { children: EditorBlock[] };
+        if (!container.children) container.children = [];
+        if ((node.type === 'listItem' || node.type === 'blockquote') && container.children.length === 0) {
+            container.children.push({ type: 'paragraph', children: [] });
+        }
+        for (const child of container.children) fill(child);
+    };
+    for (const child of doc.children) fill(child);
     if (!doc.children.every(hasKeys)) assignKeys(doc);
-    return makeState(doc, selection, 0, false, options?.editableTypes);
+    return doc;
 }
 
 function hasKeys(node: EditorBlock): boolean {
