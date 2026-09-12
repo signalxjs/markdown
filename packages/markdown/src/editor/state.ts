@@ -100,6 +100,8 @@ export function buildIndex(doc: Root, editableTypes: ReadonlySet<string> = EDITA
     const map = new Map<string, BlockEntry>();
     const keys: string[] = [];
     const editable: string[] = [];
+    /** Position of each editable key in `editable`, so neighbour lookups are O(1). */
+    const editableAt = new Map<string, number>();
 
     const walk = (parent: EditorParent, parentKey: string | null, depth: number): void => {
         const children = (parent as { children?: unknown[] }).children as EditorBlock[] | undefined;
@@ -109,7 +111,10 @@ export function buildIndex(doc: Root, editableTypes: ReadonlySet<string> = EDITA
             if (!key) return;
             map.set(key, { node, parent, parentKey, index, depth });
             keys.push(key);
-            if (editableTypes.has(node.type)) editable.push(key);
+            if (editableTypes.has(node.type)) {
+                editableAt.set(key, editable.length);
+                editable.push(key);
+            }
             if (isContainerType(node.type)) walk(node, key, depth + 1);
         });
     };
@@ -120,11 +125,11 @@ export function buildIndex(doc: Root, editableTypes: ReadonlySet<string> = EDITA
         keys: () => keys,
         editable: () => editable,
         prevEditable: (key) => {
-            const i = editable.indexOf(key);
+            const i = editableAt.get(key) ?? -1;
             return i > 0 ? editable[i - 1] : null;
         },
         nextEditable: (key) => {
-            const i = editable.indexOf(key);
+            const i = editableAt.get(key) ?? -1;
             return i >= 0 && i < editable.length - 1 ? editable[i + 1] : null;
         },
     };
