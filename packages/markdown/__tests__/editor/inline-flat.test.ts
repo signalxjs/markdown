@@ -9,6 +9,7 @@ import {
     concatFlat,
     flatEquals,
     marksAt,
+    mergeAdjacent,
     removeMark,
     sliceFlat,
     spliceFlat,
@@ -16,7 +17,7 @@ import {
     toInline,
     toggleMark,
 } from '../../src/editor/inline-flat.js';
-import type { InlineKindSpec } from '../../src/editor/inline-flat.js';
+import type { InlineKindSpec, InlineSpan } from '../../src/editor/inline-flat.js';
 import type { PhrasingContent } from '../../src/ast/index.js';
 
 const md = (nodes: PhrasingContent[]) => toMarkdown({ type: 'root', children: [{ type: 'paragraph', children: nodes }] });
@@ -137,6 +138,24 @@ describe('flat editing helpers', () => {
         expect(marksAt(base, 6)).toEqual([]);
         expect(marksAt(base, 7, 9)).toEqual(['emphasis']);
         expect(marksAt(base, 3, 8)).toEqual([]);
+    });
+
+    it('mergeAdjacent joins a mark that covers an atom with its neighbour but never two atoms', () => {
+        const text = ATOM_CHAR + 'x' + ATOM_CHAR + ATOM_CHAR;
+        const spans: InlineSpan[] = [
+            { start: 0, end: 1, type: 'image', attrs: { url: 'u' } },
+            { start: 0, end: 1, type: 'strong' },
+            { start: 1, end: 2, type: 'strong' },
+            { start: 2, end: 3, type: 'mention', attrs: { id: '1' } },
+            { start: 3, end: 4, type: 'mention', attrs: { id: '1' } },
+        ];
+        expect(mergeAdjacent(spans, text)).toEqual([
+            { start: 0, end: 2, type: 'strong' },
+            { start: 0, end: 1, type: 'image', attrs: { url: 'u' } },
+            { start: 2, end: 3, type: 'mention', attrs: { id: '1' } },
+            { start: 3, end: 4, type: 'mention', attrs: { id: '1' } },
+        ]);
+        expect(marksAt({ text, spans }, 1)).toEqual(['strong']);
     });
 
     it('toggleMark adds, merges and removes', () => {
