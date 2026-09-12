@@ -17,7 +17,7 @@
 
 import type { InlineFlat } from './inline-flat.js';
 import { flatEquals } from './inline-flat.js';
-import type { EditorSelection } from './state.js';
+import type { EditorSelection, TextSelection } from './state.js';
 import { textSelection } from './state.js';
 import type { Step } from './steps.js';
 import type { Transaction } from './transaction.js';
@@ -73,12 +73,20 @@ export interface InlineBridge {
 export function createInlineBridge(key: string, host: BridgeHost): InlineBridge {
     let composing = false;
 
+    /** A selection the surface reports, clamped to `length` (surfaces may report stale offsets). */
+    const sel = (range: Range, length: number): TextSelection => {
+        const r = clampRange(range, length);
+        return textSelection(key, r.start, r.end);
+    };
+    /** The current content's length, for events that carry a range but no content. */
+    const lengthOf = (): number => host.flatOf(key)?.text.length ?? 0;
+
     const submit = (e: SurfaceChangeEvent, endingComposition = false): void => {
         const prev = host.flatOf(key);
         if (!prev) return;
-        const selection: EditorSelection = e.selection ? textSelection(key, e.selection.start, e.selection.end) : null;
+        const selection: EditorSelection = e.selection ? sel(e.selection, e.flat.text.length) : null;
         let steps: Step[];
-        if (e.replaced) {
+        if (e.replaced && replacedMatches(prev, e.replaced, e.flat)) {
             steps = [{ type: 'replaceInline', key, from: e.replaced.from, to: e.replaced.to, slice: e.replaced.insert }];
         } else {
             const d = diffFlat(prev, e.flat);
@@ -103,17 +111,17 @@ export function createInlineBridge(key: string, host: BridgeHost): InlineBridge 
             composing = e.composing;
             submit(e);
         },
-        selection: (e) => host.setSelection(textSelection(key, e.range.start, e.range.end)),
+        selection: (e) => host.setSelection(sel(e.range, lengthOf())),
         boundary: (e) => {
-            host.setSelection(textSelection(key, e.range.start, e.range.end));
+            host.setSelection(sel(e.range, lengthOf()));
             return host.runKey(e.key);
         },
         keydown: (name, range) => {
-            host.setSelection(textSelection(key, range.start, range.end));
+            host.setSelection(sel(range, lengthOf()));
             return host.runKey(name);
         },
         paste: (e) => {
-            host.setSelection(textSelection(key, e.range.start, e.range.end));
+            host.setSelection(sel(e.range, lengthOf()));
             return host.paste(e.text, e.markdown);
         },
         focus: () => host.focused(key),
@@ -141,23 +149,29 @@ export interface CodeBridge {
 }
 
 export function createCodeBridge(key: string, host: BridgeHost): CodeBridge {
+    const sel = (range: Range, length: number): TextSelection => {
+        const r = clampRange(range, length);
+        return textSelection(key, r.start, r.end);
+    };
+    const lengthOf = (): number => host.valueOf(key)?.length ?? 0;
+
     const events: CodeSurfaceEvents = {
         change: (e) => {
             const prev = host.valueOf(key);
             if (prev === null || prev === e.value) {
-                if (e.selection) host.setSelection(textSelection(key, e.selection.start, e.selection.end));
+                if (e.selection) host.setSelection(sel(e.selection, e.value.length));
                 return;
             }
             host.dispatch({
                 steps: [{ type: 'setValue', key, value: e.value }],
-                selection: e.selection ? textSelection(key, e.selection.start, e.selection.end) : undefined,
+                selection: e.selection ? sel(e.selection, e.value.length) : undefined,
                 composing: e.composing,
                 meta: { origin: 'surface', sourceKey: key, group: e.composing ? 'ime' : 'typing', composing: e.composing },
             });
         },
-        selection: (e) => host.setSelection(textSelection(key, e.range.start, e.range.end)),
+        selection: (e) => host.setSelection(sel(e.range, lengthOf())),
         boundary: (e) => {
-            host.setSelection(textSelection(key, e.range.start, e.range.end));
+            host.setSelection(sel(e.range, lengthOf()));
             return host.runKey(e.key);
         },
         langChange: (lang) => host.dispatch({ steps: [{ type: 'setAttrs', key, attrs: { lang } }], meta: { origin: 'surface', sourceKey: key } }),
@@ -165,6 +179,19 @@ export function createCodeBridge(key: string, host: BridgeHost): CodeBridge {
         blur: () => host.focused(null),
     };
     return { events, shouldPush: (tr) => !(tr.meta.origin === 'surface' && tr.meta.sourceKey === key) };
+}
+
+/**
+ * Whether a surface's `replaced` hint really turns `prev` into `next`. A
+ * surface reports the edit against what it last showed, which can be stale
+ * (an external write deferred past a composition, a delayed DOM selection
+ * update); a hint that is out of range or does not reproduce the content
+ * would make `applyStep` throw or corrupt the block, so the bridge falls back
+ * to diffing the content instead.
+ */
+function replacedMatches(prev: InlineFlat, r: { from: number; to: number; insert: InlineFlat }, next: InlineFlat): boolean {
+    if (r.from < 0 || r.to > prev.text.length || r.from > r.to) return false;
+    return prev.text.slice(0, r.from) + r.insert.text + prev.text.slice(r.to) === next.text;
 }
 
 /** Clamp a range to a length (surfaces may report stale offsets). */

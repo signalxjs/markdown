@@ -264,6 +264,22 @@ describe('createEditor', () => {
         expect(onSelectionChange).toHaveBeenCalledWith(textSelection('b-0', 1));
         expect(onChange).toHaveBeenCalledTimes(1);
     });
+
+    it('a change event with a stale replaced range or selection never throws: the surface content wins and offsets are clamped', () => {
+        const e = make('hello');
+        const bridge = createInlineBridge('b-0', host(e));
+        bridge.events.focus();
+        // The surface still believes the block is longer than it is (a range past the end of `hello`).
+        expect(() => bridge.events.change({ flat: { text: 'hey', spans: [] }, selection: { start: 40, end: 40 }, composing: false, replaced: { from: 10, to: 12, insert: { text: 'X', spans: [] } } })).not.toThrow();
+        expect(md(e)).toBe('hey\n');
+        expect(e.state.selection).toEqual(textSelection('b-0', 3));
+        // A range that is in bounds but does not reproduce the surface's content is ignored in favour of the content.
+        bridge.events.change({ flat: { text: 'heyo', spans: [] }, selection: { start: 4, end: 4 }, composing: false, replaced: { from: 0, to: 1, insert: { text: 'Q', spans: [] } } });
+        expect(md(e)).toBe('heyo\n');
+        // A stale selection event is clamped too.
+        bridge.events.selection({ range: { start: 9, end: 12 }, caret: null });
+        expect(e.state.selection).toEqual(textSelection('b-0', 4));
+    });
 });
 
 describe('diffFlat', () => {
