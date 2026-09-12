@@ -337,6 +337,10 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
 
     const onSelectionChange = (): void => {
         if (destroyed || readOnly) return;
+        // Only the focused host reports: after keyboard focus moved to the editor
+        // root (a block selection) the DOM range may still sit in this host, and
+        // reporting it would turn the block selection back into a text one.
+        if (d.activeElement !== host) return;
         const range = currentRange();
         if (!range) return;
         if (lastRange && lastRange.start === range.start && lastRange.end === range.end) return;

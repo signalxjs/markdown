@@ -21,9 +21,11 @@ export type EditorToolbarProps = Define.WithAttrs<
     & Define.Prop<'label', string>
 >;
 
-export const EditorToolbar = component<EditorToolbarProps>(({ props }) => {
+export const EditorToolbar = component<EditorToolbarProps>(({ props, signal }) => {
     const view = useEditorView();
     const { editor } = view;
+    /** Roving tabindex: one button is in the tab order (the last focused, else the first enabled). */
+    const roving = signal<string | null>(null);
 
     const context = (): ToolbarContext => ({
         state: editor.state,
@@ -42,10 +44,19 @@ export const EditorToolbar = component<EditorToolbarProps>(({ props }) => {
         const buttons = Array.from(bar.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
         const i = buttons.indexOf(bar.ownerDocument.activeElement as HTMLButtonElement);
         if (i < 0 || !buttons.length) return;
-        if (e.key === 'ArrowRight') buttons[(i + 1) % buttons.length].focus();
-        else if (e.key === 'ArrowLeft') buttons[(i - 1 + buttons.length) % buttons.length].focus();
+        let next: HTMLButtonElement;
+        if (e.key === 'ArrowRight') next = buttons[(i + 1) % buttons.length];
+        else if (e.key === 'ArrowLeft') next = buttons[(i - 1 + buttons.length) % buttons.length];
+        else if (e.key === 'Home') next = buttons[0];
+        else if (e.key === 'End') next = buttons[buttons.length - 1];
         else return;
         e.preventDefault();
+        next.focus();
+    };
+
+    const onFocusIn = (e: FocusEvent): void => {
+        const id = (e.target as HTMLElement).getAttribute('data-item');
+        if (id) roving.value = id;
     };
 
     return () => {
@@ -60,8 +71,11 @@ export const EditorToolbar = component<EditorToolbarProps>(({ props }) => {
             if (last && last.name === item.group) last.items.push(item);
             else groups.push({ name: item.group, items: [item] });
         }
+        const enabledOf = (item: ToolbarItem): boolean => !readOnly && (item.isEnabled ? item.isEnabled(tb) : tb.mode !== 'none');
+        const current = roving.value;
+        const tabStop = items.find((i) => i.id === current && enabledOf(i))?.id ?? items.find(enabledOf)?.id ?? items[0]?.id;
         const renderItem = (item: ToolbarItem): JSXElement => {
-            const enabled = !readOnly && (item.isEnabled ? item.isEnabled(tb) : tb.mode !== 'none');
+            const enabled = enabledOf(item);
             const active = item.isActive?.(tb) ?? false;
             const run = (): void => {
                 if (!enabled) return;
@@ -80,7 +94,7 @@ export const EditorToolbar = component<EditorToolbarProps>(({ props }) => {
                     aria-label={item.label ?? item.id}
                     title={item.label ?? item.id}
                     disabled={!enabled}
-                    tabIndex={-1}
+                    tabIndex={item.id === tabStop ? 0 : -1}
                     onPointerDown={onPointerDown}
                     onClick={run}
                 >
@@ -89,7 +103,7 @@ export const EditorToolbar = component<EditorToolbarProps>(({ props }) => {
             );
         };
         return (
-            <div {...toolbarPart('root')} role="toolbar" aria-label={props.label ?? 'Formatting'} aria-orientation="horizontal" onKeyDown={onKeydown}>
+            <div {...toolbarPart('root')} role="toolbar" aria-label={props.label ?? 'Formatting'} aria-orientation="horizontal" onKeyDown={onKeydown} onFocusIn={onFocusIn}>
                 {groups.map((g, i) => (
                     <div key={g.name ?? String(i)} {...toolbarPart('group')} data-group={g.name}>
                         {g.items.map(renderItem)}

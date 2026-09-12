@@ -60,6 +60,7 @@ Every element carries `data-scope="markdown"` and `data-part="heading"`,
 Editing:
 
 ```tsx
+import { signal } from 'sigx';
 import { createSlashPlugin } from '@sigx/markdown/editor';
 import { MarkdownEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
 

@@ -125,8 +125,10 @@ test('Escape selects the block, Shift-Down extends, Backspace deletes the select
     await page.keyboard.press('Enter');
     await page.keyboard.type('three');
     await block(page, 'b-0').click();
+    await expect(block(page, 'b-0')).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(editor(page)).toHaveAttribute('data-mode', 'block');
+    await expect(editor(page)).toBeFocused();
     await expect(page.locator('#editor [data-part="block"][data-selected]')).toHaveCount(1);
     await page.keyboard.press('Shift+ArrowDown');
     await expect(page.locator('#editor [data-part="block"][data-selected]')).toHaveCount(2);

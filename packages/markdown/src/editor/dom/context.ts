@@ -128,7 +128,12 @@ export function createEditorView(opts: CreateViewOptions): EditorView {
         },
         focusRoot() {
             const el = opts.root();
-            if (el && el.ownerDocument.activeElement !== el) el.focus({ preventScroll: true });
+            if (!el) return;
+            if (el.ownerDocument.activeElement !== el) el.focus({ preventScroll: true });
+            // A DOM range left inside a surface would keep reporting (and, in some
+            // browsers, keep the caret painted there): drop it.
+            const sel = el.ownerDocument.getSelection();
+            if (sel && sel.rangeCount && el.contains(sel.anchorNode)) sel.removeAllRanges();
         },
         // Focus tracking: `focusout` fires before the next `focusin` (and before a
         // replaced element's successor mounts), so clearing is deferred a task.

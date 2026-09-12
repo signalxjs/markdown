@@ -155,6 +155,10 @@ describe('MarkdownEditor', () => {
         expect(m.root.querySelector('[data-part=block][data-key="b-1"]')!.hasAttribute('data-selected')).toBe(true);
         expect(document.activeElement).toBe(m.root);
         expect(m.root.querySelector('[data-part=live]')!.textContent).toBe('1 block selected');
+        // A late selectionchange from the blurred surface must not turn the block selection back into text.
+        document.getSelection()!.collapse(host.firstChild, 1);
+        await tick();
+        expect(m.root.getAttribute('data-mode')).toBe('block');
         m.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
         await tick();
         expect(m.controller.getMarkdown()).toBe('a\n');
@@ -166,7 +170,16 @@ describe('MarkdownEditor', () => {
         host.focus();
         document.getSelection()!.collapse(host.firstChild, 0);
         await tick();
+        // Roving tabindex: exactly one enabled button is in the tab order, and focusing another moves the stop.
+        const stops = () => Array.from(m.root.querySelectorAll('[data-scope=markdown-toolbar] button[tabindex="0"]')).map((b) => b.getAttribute('data-item'));
+        expect(stops()).toEqual(['bold']);
         const h1 = m.root.querySelector('[data-scope=markdown-toolbar] [data-item=h1]') as HTMLButtonElement;
+        h1.focus();
+        await tick();
+        expect(stops()).toEqual(['h1']);
+        host.focus();
+        document.getSelection()!.collapse(host.firstChild, 0);
+        await tick();
         expect(h1.getAttribute('data-state')).toBe('off');
         h1.click();
         await tick();

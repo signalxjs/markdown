@@ -144,6 +144,7 @@ export function createDomCodeSurface(textarea: HTMLTextAreaElement, init: CodeSu
     };
 
     const onSelect = (): void => {
+        if (textarea.ownerDocument.activeElement !== textarea) return;
         const r = range();
         if (lastRange && lastRange.start === r.start && lastRange.end === r.end) return;
         lastRange = r;

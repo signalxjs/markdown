@@ -6,15 +6,17 @@
  * Platform-neutral — the popup is the view's; this contributes the trigger.
  */
 
-import type { Command } from './commands.js';
+import type { BlockContent } from '../ast/index.js';
+import { insertBlockAfter, type Command } from './commands.js';
 import { filterMenu, turnIntoCommand } from './menu.js';
 import type { EditorPlugin } from './plugin.js';
 import { builtinBlockEditors, type BlockEditorSpec, type BlockMenuEntry } from './schema.js';
 import type { TriggerItem, TriggerSpec } from './trigger/index.js';
 
+/** A custom slash entry: `run` a command, or let `create()` build the block that is inserted (replacing an empty paragraph). */
 export interface SlashItem extends BlockMenuEntry {
     id: string;
-    /** Run instead of creating a block. Receives the editor commands context through the trigger API. */
+    /** Run this instead of inserting `create()`. */
     run?: Command;
 }
 
@@ -32,6 +34,7 @@ export interface SlashPluginOptions {
 interface SlashTriggerItem extends TriggerItem {
     spec?: BlockEditorSpec;
     run?: Command;
+    create?: () => BlockContent;
     keywords?: readonly string[];
     icon?: string;
     group?: string;
@@ -50,7 +53,8 @@ export function createSlashPlugin(options: SlashPluginOptions = {}): EditorPlugi
         onSelect: (item, api) => {
             const picked = item as SlashTriggerItem;
             api.replaceQuery({ text: '', spans: [] });
-            const command = picked.run ?? (picked.spec ? turnIntoCommand(picked.spec) : null);
+            // A custom item runs its command, else inserts what it creates; a schema entry converts or inserts.
+            const command = picked.run ?? (picked.spec ? turnIntoCommand(picked.spec) : picked.create ? insertBlockAfter(picked.create()) : null);
             if (command) api.run(command);
         },
     };

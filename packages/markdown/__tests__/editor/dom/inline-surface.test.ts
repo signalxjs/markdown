@@ -109,6 +109,22 @@ describe('DomInlineSurface', () => {
         expect(ev.log.some((l) => l.startsWith('boundary:'))).toBe(false);
     });
 
+    it('reports selection changes only while the host has focus', () => {
+        const { surface, ev } = make({ text: 'hello', spans: [] });
+        surface.focus({ offset: 1 });
+        expect(ev.log).toContain('sel:1-1');
+        // Focus moves elsewhere (the editor root) while the DOM range stays in the host.
+        const other = document.createElement('div');
+        other.tabIndex = -1;
+        document.body.appendChild(other);
+        other.focus();
+        const before = ev.log.length;
+        document.getSelection()!.collapse(surface.host.firstChild, 3);
+        expect(ev.log.length).toBe(before);
+        expect(ev.log).not.toContain('sel:3-3');
+        other.remove();
+    });
+
     it('Mod-a selects the block text first and reaches the keymap only once everything is selected', () => {
         const { surface, ev } = make({ text: 'ab', spans: [] });
         surface.focus({ offset: 1 });
