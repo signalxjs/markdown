@@ -85,7 +85,7 @@ export function createFakeInlineSurface(init: InlineSurfaceInit): FakeInlineSurf
                 const o = target.edge === 'start' ? 0 : flat.text.length;
                 selection = { start: o, end: o };
             } else if (target && 'line' in target) {
-                const o = target.line === 'first' ? Math.min(target.x, flat.text.length) : flat.text.length;
+                const o = surface.offsetAtX(target.line, target.x);
                 selection = { start: o, end: o };
             }
             init.events.focus();

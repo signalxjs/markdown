@@ -56,6 +56,19 @@ describe('FakeInlineSurface driver', () => {
         expect(changes).toEqual(['ab']);
     });
 
+    it('focus({ line, x }) takes x in the same pixel space as caretRect and offsetAtX', () => {
+        const s = make('abcd');
+        s.focus({ offset: 3 });
+        const x = s.caretRect()!.x;
+        s.focus({ line: 'first', x });
+        expect(s.getSelection()).toEqual({ start: 3, end: 3 });
+        expect(s.offsetAtX('first', x)).toBe(3);
+        s.focus({ line: 'first', x: 10_000 });
+        expect(s.getSelection()).toEqual({ start: 4, end: 4 });
+        s.focus({ line: 'last', x: 0 });
+        expect(s.getSelection()).toEqual({ start: 4, end: 4 });
+    });
+
     it('compose shows each provisional update through getFlat/getSelection/isComposing while it is emitted', () => {
         const seen: Array<{ text: string; sel: { start: number; end: number } | null; composing: boolean }> = [];
         const s = make('a', false, () => seen.push({ text: s.getFlat().text, sel: s.getSelection(), composing: s.isComposing() }));
