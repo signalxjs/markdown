@@ -200,7 +200,8 @@ Source layout (`packages/markdown/src`):
 - **Imports point one way**:
   `utils ← ast ← plugin ← parser ← serializer ← render ← plugins`; `stream/`
   depends on `@sigx/reactivity` only; `dom ← shiki` and `editor ← editor/dom` sit on
-  top of the root layers; `testing/` is on top of everything and nothing
+  top of the root layers (`editor/dom` may import `dom` — void blocks render
+  through the DOM components — never the reverse); `testing/` is on top of everything and nothing
   imports from it. No cycles.
 - **Every entry point is a folder** — `src/index.ts` for `.`,
   `src/<entry>/index.ts` for a subpath — and those files are re-exports

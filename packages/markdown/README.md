@@ -14,7 +14,7 @@ block-tree editor. Zero dependencies, no `node:` imports.
 | `@sigx/markdown/dom` | `MarkdownView` for the web, the default DOM components (`data-scope` / `data-part` styling seam) and the `CodeBlock` chrome |
 | `@sigx/markdown/shiki` | `createShikiHighlighter()` + `shikiCodeBlock()` — optional Shiki highlighting for code blocks (`shiki` is an optional peer) |
 | `@sigx/markdown/editor` | the block-tree editor core: `createEditor()`, state, steps, history, commands, keymap, input rules, triggers, toolbar items and the `InlineSurface` / `CodeSurface` contracts a platform implements |
-| `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web (next release) |
+| `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web: `contenteditable` block surfaces, toolbar, block menu, slash commands, mentions, two-way `markdown` / `document` models, `data-scope` / `data-part` styling |
 
 ## Install
 
@@ -23,7 +23,7 @@ npm install @sigx/markdown
 ```
 
 Peers on `@sigx/reactivity` and `@sigx/runtime-core` at the same minor as
-your app's `sigx`.
+your app's `sigx` (`@sigx/runtime-dom` too for `./dom` and `./editor/dom`).
 
 ## Taste
 
@@ -56,6 +56,26 @@ Every element carries `data-scope="markdown"` and `data-part="heading"`,
 `"code"`, `"link"`, … — style them with attribute selectors (the playground's
 `styles.css` is the reference stylesheet), or pass `classPrefix="md"` for
 `md-heading`-style classes, or replace any slot through `components`.
+
+Editing:
+
+```tsx
+import { createSlashPlugin } from '@sigx/markdown/editor';
+import { MarkdownEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
+
+const plugins = [createDomMentionPlugin({ onQuery: (q) => people(q) }), createSlashPlugin()];
+const note = signal({ md: '# Hi' });
+
+<MarkdownEditor model:markdown={[note, 'md']} plugins={plugins} placeholder="Write…" />
+```
+
+A block-tree editor on the same mdast document: one `contenteditable` per
+paragraph or heading, a `<textarea>` per code block, Enter / Backspace /
+arrows / Tab handled by the core, markdown input rules (`# `, `- `,
+`**bold**`), undo grouped by typing, a toolbar, block handles with a menu,
+`/` commands and `@` mentions. Elements carry `data-scope="markdown-editor"`
+(and `markdown-toolbar`, `markdown-block-menu`, `markdown-suggest`) with
+`data-part` — the playground's `editor.css` is the reference stylesheet.
 
 ## Documentation
 

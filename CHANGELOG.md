@@ -78,6 +78,58 @@ workspace shares one version line.
 - `@sigx/markdown/testing`: `createFakeInlineSurface` / `createFakeCodeSurface`
   and `runInlineSurfaceConformance()` — the suite every surface implementation
   (DOM, Lynx, the fake) runs.
+- `@sigx/markdown/editor/dom` entry (#13) — the web block editor:
+  - **`<MarkdownEditor>`** — two-way `markdown` (string) and `document`
+    (mdast `Root`) models with echo suppression, `defaultMarkdown` /
+    `defaultDocument`, `plugins`, `components`, `atoms`, `toolbar`
+    (`true | 'top' | 'bottom' | false`), `toolbarItems`, `renderToolbarItem`,
+    `renderSuggestion`, `blockHandles`, `readOnly`, `placeholder`,
+    `autofocus`, `keymap`, `inputRules`, `onChange`, `onSelectionChange`, a
+    `ready` event and a `ref` controller (`editor`, `getMarkdown`,
+    `getDocument`, `setMarkdown`, `setDocument`, `run`, `focus`, `blur`,
+    `clear`, `undo`, `redo`). Renders read-only through `<MarkdownView>` on
+    the server and before mount.
+  - **Blocks** — keyed `<BlockView>`s dispatching on the schema kind: inline
+    containers (paragraph, heading, table cell) as `contenteditable` hosts
+    owned by a `DomInlineSurface`, code and `html` blocks as a `<textarea>`
+    `DomCodeSurface` with a language field, void blocks (rendered by the DOM
+    components, selectable), lists (with task checkboxes), blockquotes and
+    tables. Structural sharing in the state means an untouched block is
+    never re-rendered or re-mounted.
+  - **Surfaces** — `createDomInlineSurface()`: a single-line port of the
+    Lynx web element's DOM algorithms (`renderInline` / tolerant
+    `readInline`, `offsetToPoint` / `pointToOffset`, shadow-root aware
+    selection, caret rects, first/last visual line detection), boundary keys
+    for the core, chords forwarded to the keymap, `beforeinput` routing for
+    virtual keyboards and native format/history commands, paste, IME with
+    post-`compositionend` dedupe, progressive Mod-a. Passes the surface
+    conformance suite under happy-dom.
+  - **Chrome** — `<EditorToolbar>` (`role="toolbar"`, `data-state="on|off"`),
+    block handles opening `<BlockMenu>` (turn into, move, duplicate, delete;
+    `role="menu"` with roving focus), `<SuggestionPopup>` (`role="listbox"`)
+    driven by trigger sessions with the caret kept in the surface, block
+    selection on the editor root (Escape, Shift-arrows, Backspace/Delete,
+    copy/cut as markdown, a live region), a click below the last block
+    focusing its end. Every element carries `data-scope` (`markdown-editor`,
+    `markdown-toolbar`, `markdown-block-menu`, `markdown-suggest`) and
+    `data-part` attributes; no CSS ships (`examples/playground/src/editor.css`
+    is the reference stylesheet).
+  - **Plugins** — `createDomMentionPlugin()` (the mention syntax, atom kind,
+    `@` trigger and chip) and, in `./editor`, `createMentionPlugin()`,
+    `mentionInlineKind`, `createSlashPlugin()` (`/` block commands from the
+    schema menu plus custom items), `turnIntoCommand()`, `filterMenu()`;
+    a plugin's `editor.dom.atoms` slot ships chip renderers.
+  - `./editor`: `TriggerSelectApi.run()`, an optional `keydown` channel on
+    `CodeSurfaceEvents`; `insertBlocks` merges only pasted *paragraphs* into
+    the paste edges (a heading, list or code block stays its own block),
+    replaces an empty paragraph with the first pasted block and lands the
+    caret in the last editable of the last pasted block; `mergeAdjacent` no
+    longer treats a built-in mark covering exactly one atom as an atom.
+  - Serializer: a run-final `!` stays bare unless the next node starts with
+    `[`.
+  - `examples/playground`: an Editor toggle (mentions + slash commands,
+    bound to the same source as the panes) and eleven Playwright tests
+    driving the editor in Chromium.
 - Serializer: a bare autolink literal is emitted only at a word boundary
   (otherwise the angle form); a list item whose first paragraph is empty puts
   its marker alone on the line so nested content re-parses correctly.
