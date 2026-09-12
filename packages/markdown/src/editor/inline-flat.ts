@@ -192,7 +192,12 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
         points.add(s.start);
         points.add(s.end);
     }
-    for (let i = 0; i < text.length; i++) if (text[i] === '\n') points.add(i), points.add(i + 1);
+    for (let i = 0; i < text.length; i++) {
+        if (text[i] === '\n') {
+            points.add(i);
+            points.add(i + 1);
+        }
+    }
     const sorted = [...points].sort((a, b) => a - b);
 
     interface Run {
@@ -349,7 +354,15 @@ export function flatEquals(a: InlineFlat, b: InlineFlat): boolean {
     return true;
 }
 
-/** Replace `[from, to)` with `slice`, shifting and splitting spans as a text editor would. */
+/**
+ * Replace `[from, to)` with `slice`. Exact and invertible: a mark strictly
+ * inside the range is dropped, one that straddles both edges grows over the
+ * inserted text, one that overlaps an edge is clipped to its outside part,
+ * and the inserted text carries only the marks `slice.spans` give it (a
+ * command that wants typed text to inherit marks passes them explicitly —
+ * see `marksAt`). Atoms inside the range are removed. The inverse is the
+ * same splice with the removed text and its clipped spans (`sliceFlat`).
+ */
 export function spliceFlat(flat: InlineFlat, from: number, to: number, slice: InlineFlat): InlineFlat {
     const delta = slice.text.length - (to - from);
     const text = flat.text.slice(0, from) + slice.text + flat.text.slice(to);
@@ -359,19 +372,17 @@ export function spliceFlat(flat: InlineFlat, from: number, to: number, slice: In
             spans.push({ ...s });
         } else if (s.start >= to) {
             spans.push({ ...s, start: s.start + delta, end: s.end + delta });
-        } else {
-            // Overlaps the replaced range. Marks shrink/grow around it; atoms inside it are removed.
-            const isAtom = s.end - s.start === 1 && flat.text[s.start] === ATOM_CHAR;
-            if (isAtom) continue;
-            // A mark that started before the range keeps its head (and grows over
-            // the inserted text); one that started inside it is cut to the tail.
-            const ns = s.start < from ? s.start : from + slice.text.length;
-            const ne = s.end > to ? s.end + delta : from + (s.start < from ? slice.text.length : 0);
-            if (ne > ns) spans.push({ ...s, start: ns, end: ne });
+        } else if (s.start < from && s.end > to) {
+            spans.push({ ...s, end: s.end + delta });
+        } else if (s.start < from) {
+            spans.push({ ...s, end: from });
+        } else if (s.end > to) {
+            spans.push({ ...s, start: from + slice.text.length, end: s.end + delta });
         }
+        // else: inside the range (incl. atoms) — dropped.
     }
     for (const s of slice.spans) spans.push({ ...s, start: s.start + from, end: s.end + from });
-    return { text, spans: normalizeSpans(spans) };
+    return { text, spans: mergeAdjacent(spans, text) };
 }
 
 /** Slice `[from, to)` out as its own flat model (spans clipped and re-based). */

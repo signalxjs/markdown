@@ -105,10 +105,15 @@ describe('flat editing helpers', () => {
         expect(inserted.text).toBe('hello, world');
         expect(inserted.spans).toEqual([{ start: 0, end: 5, type: 'strong' }, { start: 7, end: 12, type: 'emphasis' }]);
         const grown = spliceFlat(base, 2, 2, { text: 'XX', spans: [] });
-        expect(grown.spans[0]).toEqual({ start: 0, end: 7, type: 'strong' });
+        expect(grown.spans[0]).toEqual({ start: 0, end: 7, type: 'strong' }); // straddled: grows
+        const atEnd = spliceFlat(base, 5, 5, { text: 'X', spans: [] });
+        expect(atEnd.spans[0]).toEqual({ start: 0, end: 5, type: 'strong' }); // at the edge: unchanged
         const deleted = spliceFlat(base, 3, 8, { text: '', spans: [] });
         expect(deleted.text).toBe('helrld');
         expect(deleted.spans).toEqual([{ start: 0, end: 3, type: 'strong' }, { start: 3, end: 6, type: 'emphasis' }]);
+        // Exactness: the inverse splice restores the original model.
+        const back = spliceFlat(deleted, 3, 3, sliceFlat(base, 3, 8));
+        expect(flatEquals(back, base)).toBe(true);
         const withSpans = spliceFlat(base, 11, 11, { text: '!', spans: [{ start: 0, end: 1, type: 'delete' }] });
         expect(withSpans.spans).toContainEqual({ start: 11, end: 12, type: 'delete' });
     });
