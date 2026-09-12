@@ -73,9 +73,11 @@ export const builtinBlockEditors: BlockEditorSpec[] = [
         menu: { label: 'Heading', icon: 'heading', group: 'basic', keywords: ['title', 'h1', 'h2', 'h3'], create: () => ({ type: 'heading', depth: 1, children: [] }) },
     },
     {
+        // A cell is edited like a paragraph but is never a conversion target:
+        // no `fromInline` (a cell is not `BlockContent`; cells come from the
+        // table commands), so `setBlockType('tableCell')` is refused.
         type: 'tableCell',
         kind: 'inline',
-        fromInline: (children) => ({ type: 'paragraph', children }),
         toInline: (node) => (node as { children: PhrasingContent[] }).children,
     },
     {

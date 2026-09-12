@@ -172,6 +172,13 @@ describe('block type and lists', () => {
         expect(run('```js\nx\n```', at('b-0', 1), C.setBlockType('paragraph')).md).toBe('x\n');
     });
 
+    it('setBlockType refuses tableCell as a target: a cell is never a conversion result', () => {
+        const r = run('## ab', at('b-0', 1), C.setBlockType('tableCell'));
+        expect(r.ok).toBe(false);
+        expect(r.md).toBe('## ab\n');
+        expect(schema.get('tableCell')?.fromInline).toBeUndefined();
+    });
+
     it('setBlockType applies to every block of a block selection', () => {
         expect(run('a\n\nb\n\nc', blockSelection('b-0', 'b-1'), C.setBlockType('heading', { depth: 1 })).md).toBe('# a\n\n# b\n\nc\n');
     });
