@@ -255,11 +255,19 @@ describe('DomInlineSurface', () => {
         expect(onEmpty.mock.calls).toEqual([[false], [true]]);
     });
 
-    it('destroy removes the listeners', () => {
-        const { surface, ev } = make({ text: 'ab', spans: [] });
-        surface.destroy();
-        surface.focus({ offset: 0 });
-        keydown(surface, 'Enter');
-        expect(ev.log.some((l) => l.startsWith('boundary:'))).toBe(false);
+    it('destroy removes the listeners, including the shared selectionchange listener with the last surface', () => {
+        const add = vi.spyOn(document, 'addEventListener');
+        const remove = vi.spyOn(document, 'removeEventListener');
+        const a = make({ text: 'ab', spans: [] });
+        const b = make({ text: 'cd', spans: [] });
+        const added = add.mock.calls.filter((c) => c[0] === 'selectionchange');
+        expect(added.length).toBeGreaterThanOrEqual(1);
+        a.surface.destroy();
+        expect(remove.mock.calls.filter((c) => c[0] === 'selectionchange')).toHaveLength(0);
+        b.surface.destroy();
+        expect(remove.mock.calls.filter((c) => c[0] === 'selectionchange')).toHaveLength(1);
+        a.surface.focus({ offset: 0 });
+        keydown(a.surface, 'Enter');
+        expect(a.ev.log.some((l) => l.startsWith('boundary:'))).toBe(false);
     });
 });

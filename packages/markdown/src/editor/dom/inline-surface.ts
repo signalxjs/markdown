@@ -74,20 +74,28 @@ const REFUSED_INPUT = new Set([
     'formatFontName',
 ]);
 
-/** Per-document `selectionchange` fan-out: one listener, however many surfaces. */
-const listeners = new WeakMap<Document, Set<() => void>>();
+/** Per-document `selectionchange` fan-out: one listener, however many surfaces; removed with the last subscriber. */
+const listeners = new WeakMap<Document, { set: Set<() => void>; handler: () => void }>();
 function watchSelection(d: Document, fn: () => void): () => void {
-    let set = listeners.get(d);
-    if (!set) {
-        set = new Set();
-        listeners.set(d, set);
-        d.addEventListener('selectionchange', () => {
-            for (const f of listeners.get(d) ?? []) f();
-        });
+    let entry = listeners.get(d);
+    if (!entry) {
+        const set = new Set<() => void>();
+        const handler = (): void => {
+            for (const f of Array.from(set)) f();
+        };
+        entry = { set, handler };
+        listeners.set(d, entry);
+        d.addEventListener('selectionchange', handler);
     }
-    set.add(fn);
+    entry.set.add(fn);
     return () => {
-        set!.delete(fn);
+        const e = listeners.get(d);
+        if (!e) return;
+        e.set.delete(fn);
+        if (e.set.size === 0) {
+            d.removeEventListener('selectionchange', e.handler);
+            listeners.delete(d);
+        }
     };
 }
 

@@ -26,7 +26,11 @@ export type SuggestionPopupProps =
     & Define.Prop<'maxHeight', number>
     & Define.Prop<'id', string>;
 
+let instances = 0;
+
 export const SuggestionPopup = component<SuggestionPopupProps>(({ props }) => {
+    /** A per-instance default id: several editors on one page must not share `aria-activedescendant` targets. */
+    const defaultId = `markdown-suggest-${++instances}`;
     const onPointerDown = (e: PointerEvent): void => {
         e.preventDefault();
     };
@@ -52,7 +56,7 @@ export const SuggestionPopup = component<SuggestionPopupProps>(({ props }) => {
             placement.placement === 'below'
                 ? `position:absolute;left:${placement.left}px;top:${placement.top ?? 0}px;width:${width}px;max-height:${placement.maxHeight}px`
                 : `position:absolute;left:${placement.left}px;bottom:${placement.bottom ?? 0}px;width:${width}px;max-height:${placement.maxHeight}px`;
-        const id = props.id ?? 'markdown-suggest';
+        const id = props.id ?? defaultId;
         return (
             <div {...suggestPart('root')} data-state="open" data-placement={placement.placement} data-trigger={session.plugin} style={style} onPointerDown={onPointerDown}>
                 <div {...suggestPart('list')} id={id} role="listbox" aria-label="Suggestions" aria-activedescendant={session.items[active] ? `${id}-${active}` : undefined}>
