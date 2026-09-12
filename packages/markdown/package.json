@@ -24,6 +24,12 @@
             "production": "./dist/shiki.prod.js",
             "import": "./dist/shiki.js"
         },
+        "./editor": {
+            "types": "./dist/editor/index.d.ts",
+            "development": "./dist/editor.js",
+            "production": "./dist/editor.prod.js",
+            "import": "./dist/editor.js"
+        },
         "./testing": {
             "types": "./dist/testing/index.d.ts",
             "development": "./dist/testing.js",

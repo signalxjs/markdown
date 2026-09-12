@@ -73,7 +73,7 @@ export interface InlineBridge {
 export function createInlineBridge(key: string, host: BridgeHost): InlineBridge {
     let composing = false;
 
-    const submit = (e: SurfaceChangeEvent): void => {
+    const submit = (e: SurfaceChangeEvent, endingComposition = false): void => {
         const prev = host.flatOf(key);
         if (!prev) return;
         const selection: EditorSelection = e.selection ? textSelection(key, e.selection.start, e.selection.end) : null;
@@ -93,7 +93,8 @@ export function createInlineBridge(key: string, host: BridgeHost): InlineBridge 
             steps,
             selection: e.selection ? selection : undefined,
             composing: e.composing,
-            meta: { origin: 'surface', sourceKey: key, group: e.composing ? 'ime' : 'typing', composing: e.composing },
+            // The commit that ends a composition joins the open `ime` group, so the whole composition is one undo.
+            meta: { origin: 'surface', sourceKey: key, group: e.composing || endingComposition ? 'ime' : 'typing', composing: e.composing },
         });
     };
 
@@ -123,7 +124,7 @@ export function createInlineBridge(key: string, host: BridgeHost): InlineBridge 
         },
         compositionEnd: (flat) => {
             composing = false;
-            submit({ flat, selection: null, composing: false });
+            submit({ flat, selection: null, composing: false }, true);
             host.dispatch({ steps: [], composing: false, meta: { origin: 'surface', sourceKey: key, addToHistory: false } });
         },
     };

@@ -39,6 +39,7 @@ const ENTRIES = [
     '@sigx/markdown',
     '@sigx/markdown/dom',
     '@sigx/markdown/shiki',
+    '@sigx/markdown/editor',
     '@sigx/markdown/testing',
 ];
 
