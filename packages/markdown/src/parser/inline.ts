@@ -625,7 +625,7 @@ function scanBracketed(
     }
     const children = parseLabel();
     if (!isImage && containsLink(children)) return null;
-    const identifier = normalizeLabel(refLabel!);
+    const identifier = normalizeLabel(refLabel!, state.entities);
     if (isImage) {
         const node: ImageReference = {
             type: 'imageReference',

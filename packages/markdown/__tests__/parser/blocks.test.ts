@@ -140,6 +140,14 @@ describe('parseMarkdown (blocks)', () => {
         expect((b[2] as Paragraph).children[0]).toMatchObject({ value: 'rest' });
     });
 
+    it('normalises identifiers after decoding character references, keeping backslash escapes', () => {
+        const b = parse('[&amp; Foo]: /u\n\n[&amp;  foo] [& FOO] [foo\\\\]\n\n[foo\\\\]: /v');
+        expect(b[0]).toMatchObject({ type: 'definition', identifier: '& foo' });
+        const refs = (b[1] as Paragraph).children.filter((n) => n.type === 'linkReference');
+        expect(refs.map((r) => (r as { identifier: string }).identifier)).toEqual(['& foo', '& foo', 'foo\\\\']);
+        expect(b[2]).toMatchObject({ type: 'definition', identifier: 'foo\\\\' });
+    });
+
     it('does not treat a definition under a setext underline as a heading', () => {
         const b = parse('[foo]: /url\n===');
         expect(types(b)).toEqual(['definition', 'paragraph']);

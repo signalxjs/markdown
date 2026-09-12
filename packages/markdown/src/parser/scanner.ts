@@ -214,7 +214,7 @@ export function scanDefinition(text: string, pos: number, entities?: ReadonlyMap
     }
     if (text[end] === '\n') end++;
     return {
-        identifier: normalizeLabel(label.raw),
+        identifier: normalizeLabel(label.raw, entities),
         label: label.raw,
         url: unescapeString(dest.raw, entities),
         title,
