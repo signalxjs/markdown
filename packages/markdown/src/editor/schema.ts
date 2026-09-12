@@ -5,7 +5,7 @@
  * as a void block) through `MarkdownPlugin.editor.blockEditors`.
  */
 
-import type { BlockContent, PhrasingContent } from '../ast/index.js';
+import type { BlockContent, HeadingDepth, PhrasingContent } from '../ast/index.js';
 import type { EditorBlock } from './state.js';
 
 export type SurfaceKind = 'inline' | 'code' | 'void' | 'container' | 'table';
@@ -50,6 +50,12 @@ function textOf(children: PhrasingContent[]): string {
     return out;
 }
 
+/** A heading depth from loose attrs: clamped to 1..6, integer, 1 when missing or not a number. */
+function headingDepth(value: unknown): HeadingDepth {
+    const n = Math.trunc(Number(value));
+    return (Number.isFinite(n) && n >= 1 ? Math.min(n, 6) : 1) as HeadingDepth;
+}
+
 function paragraphOf(text: string): BlockContent {
     return { type: 'paragraph', children: text ? [{ type: 'text', value: text }] : [] };
 }
@@ -68,7 +74,7 @@ export const builtinBlockEditors: BlockEditorSpec[] = [
         type: 'heading',
         kind: 'inline',
         splitsTo: 'paragraph',
-        fromInline: (children, attrs) => ({ type: 'heading', depth: (Number(attrs?.depth) || 1) as 1, children: children.filter((c) => c.type !== 'break') }),
+        fromInline: (children, attrs) => ({ type: 'heading', depth: headingDepth(attrs?.depth), children: children.filter((c) => c.type !== 'break') }),
         toInline: (node) => (node as { children: PhrasingContent[] }).children,
         menu: { label: 'Heading', icon: 'heading', group: 'basic', keywords: ['title', 'h1', 'h2', 'h3'], create: () => ({ type: 'heading', depth: 1, children: [] }) },
     },

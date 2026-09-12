@@ -172,6 +172,18 @@ describe('block type and lists', () => {
         expect(run('```js\nx\n```', at('b-0', 1), C.setBlockType('paragraph')).md).toBe('x\n');
     });
 
+    it('setBlockType clamps a heading depth to 1..6 and defaults a missing or invalid one to 1', () => {
+        const depthOf = (attrs?: Record<string, unknown>) => {
+            const r = run('ab', at('b-0', 1), C.setBlockType('heading', attrs));
+            return { md: r.md, depth: (r.state.doc.children[0] as { depth: number }).depth };
+        };
+        expect(depthOf({ depth: 9 })).toEqual({ md: '###### ab\n', depth: 6 });
+        expect(depthOf({ depth: 0 })).toEqual({ md: '# ab\n', depth: 1 });
+        expect(depthOf({ depth: 'x' })).toEqual({ md: '# ab\n', depth: 1 });
+        expect(depthOf({ depth: 2.7 })).toEqual({ md: '## ab\n', depth: 2 });
+        expect(depthOf()).toEqual({ md: '# ab\n', depth: 1 });
+    });
+
     it('setBlockType refuses tableCell as a target: a cell is never a conversion result', () => {
         const r = run('## ab', at('b-0', 1), C.setBlockType('tableCell'));
         expect(r.ok).toBe(false);
