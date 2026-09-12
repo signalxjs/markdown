@@ -9,12 +9,11 @@ block-tree editor. Zero dependencies, no `node:` imports.
 
 | Entry | What |
 |---|---|
-| `@sigx/markdown` | the AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`, `toJSON` / `fromJSON`, `createMarkdownStream`, `renderDocument`, the plugin contract |
-| `@sigx/markdown/dom` | `MarkdownView` for the web, default DOM components, code-block chrome |
-| `@sigx/markdown/shiki` | optional Shiki highlighting for code blocks (`shiki` is an optional peer) |
-| `@sigx/markdown/editor` | the block-tree editor core and the surface contract a platform implements |
-| `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web |
-| `@sigx/markdown/testing` | streaming harness, structural `strip()`, the surface conformance suite |
+| `@sigx/markdown` | the AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`, `toJSON` / `fromJSON`, `createMarkdownStream`, `renderDocument`, the `MarkdownPlugin` contract, `mentionPlugin` |
+| `@sigx/markdown/testing` | `strip()`, `toHtml()`, `feed()` — helpers for tests that parse, stream or render |
+| `@sigx/markdown/dom` | `MarkdownView` for the web (next release) |
+| `@sigx/markdown/shiki` | optional Shiki highlighting for code blocks (next release) |
+| `@sigx/markdown/editor`, `./editor/dom` | the block-tree editor core and the web editor (planned) |
 
 ## Install
 
@@ -22,8 +21,26 @@ block-tree editor. Zero dependencies, no `node:` imports.
 npm install @sigx/markdown
 ```
 
-Peers on `@sigx/reactivity` and `@sigx/runtime-core` (plus `@sigx/runtime-dom`
-for the web entries) at the same minor as your app's `sigx`.
+Peers on `@sigx/reactivity` and `@sigx/runtime-core` at the same minor as
+your app's `sigx`.
+
+## Taste
+
+```ts
+import { createIncrementalEngine, parseMarkdown, toJSON, toMarkdown } from '@sigx/markdown';
+
+const root = parseMarkdown('# Hi\n\nSome **markdown**.');   // an mdast Root, keyed and positioned
+toMarkdown(root);                                            // '# Hi\n\nSome **markdown**.\n'
+JSON.stringify(toJSON(root));                                // the save format, { data: { version: 1 } }
+
+const engine = createIncrementalEngine();
+const a = engine.parse('# Hi\n\nSome **mark');
+const b = engine.parse('# Hi\n\nSome **markdown**.');
+a.children[0] === b.children[0];                             // true: finalized blocks keep identity
+```
+
+Streaming: `createMarkdownStream({ flushIntervalMs: 16 })` coalesces tokens
+into one signal write per frame; pass `stream.value.value` to a view.
 
 ## Documentation
 

@@ -1,0 +1,32 @@
+[
+    {
+        "example": 11,
+        "section": "Strikethrough",
+        "markdown": "~~Hi~~ Hello, world!\n",
+        "html": "<p><del>Hi</del> Hello, world!</p>\n"
+    },
+    {
+        "example": 12,
+        "section": "Strikethrough",
+        "markdown": "Hello, ~there~ world!\n",
+        "html": "<p>Hello, ~there~ world!</p>\n"
+    },
+    {
+        "example": 13,
+        "section": "Strikethrough",
+        "markdown": "This will ~~~not~~~ strike.\n",
+        "html": "<p>This will ~~~not~~~ strike.</p>\n"
+    },
+    {
+        "example": 14,
+        "section": "Strikethrough",
+        "markdown": "This ~~has a\n\nnew paragraph~~.\n",
+        "html": "<p>This ~~has a</p>\n<p>new paragraph~~.</p>\n"
+    },
+    {
+        "example": 15,
+        "section": "Strikethrough",
+        "markdown": "~~**bold** and `code`~~\n",
+        "html": "<p><del><strong>bold</strong> and <code>code</code></del></p>\n"
+    }
+]

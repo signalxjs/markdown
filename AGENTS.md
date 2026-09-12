@@ -191,14 +191,15 @@ name — vitest matches aliases in order), to `exports` in `package.json` and
 Source layout (`packages/markdown/src`):
 
 - **One folder per concern; its `index.ts` is the folder's public surface.**
-  `utils/`, `ast/`, `plugin/`, `parser/`, `serializer/`, `render/`, `stream/`,
+  `utils/`, `ast/`, `plugin/` (the contract), `parser/`, `serializer/`,
+  `render/`, `stream/`, `plugins/` (the reference plugins, e.g. mention),
   `dom/`, `shiki/`, `editor/` (with `editor/dom/`), `testing/`. Cross-folder
   imports go through `../<folder>/index.js`; inside a folder, siblings import
   each other directly. A file a folder's `index.ts` does not re-export is
   private to that folder.
 - **Imports point one way**:
-  `utils ← ast ← plugin ← parser ← serializer ← render`; `stream/` depends on
-  `@sigx/reactivity` only; `dom ← shiki` and `editor ← editor/dom` sit on
+  `utils ← ast ← plugin ← parser ← serializer ← render ← plugins`; `stream/`
+  depends on `@sigx/reactivity` only; `dom ← shiki` and `editor ← editor/dom` sit on
   top of the root layers; `testing/` is on top of everything and nothing
   imports from it. No cycles.
 - **Every entry point is a folder** — `src/index.ts` for `.`,
