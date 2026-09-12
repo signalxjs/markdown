@@ -167,6 +167,7 @@ export interface FakeCodeSurface extends CodeSurface {
 export function createFakeCodeSurface(init: CodeSurfaceInit): FakeCodeSurface {
     let value = init.value;
     let selection: Range | null = null;
+    let readOnly = init.readOnly;
     const calls: SurfaceCall[] = [];
     const record = (method: string, ...args: unknown[]): void => {
         calls.push({ method, args });
@@ -200,11 +201,13 @@ export function createFakeCodeSurface(init: CodeSurfaceInit): FakeCodeSurface {
         getSelection: () => selection,
         setReadOnly(v) {
             record('setReadOnly', v);
+            readOnly = v;
         },
         destroy() {
             record('destroy');
         },
         type(text) {
+            if (readOnly) return;
             const { start, end } = sel();
             value = value.slice(0, start) + text + value.slice(end);
             selection = { start: start + text.length, end: start + text.length };

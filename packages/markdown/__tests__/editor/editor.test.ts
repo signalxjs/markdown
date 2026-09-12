@@ -230,6 +230,22 @@ describe('createEditor', () => {
         expect(e.state.doc.children[1].type).toBe('paragraph');
     });
 
+    it('a read-only fake code surface refuses typing, like the inline one', () => {
+        const e = make('```js\nx\n```');
+        const bridge = createCodeBridge('b-0', host(e));
+        const c = createFakeCodeSurface({ key: 'b-0', value: 'x', lang: 'js', readOnly: true, events: bridge.events });
+        c.focus({ offset: 1 });
+        c.type('y');
+        expect(c.getValue()).toBe('x');
+        expect(md(e)).toBe('```js\nx\n```\n');
+        c.setReadOnly(false);
+        c.type('y');
+        expect(md(e)).toBe('```js\nxy\n```\n');
+        c.setReadOnly(true);
+        c.type('z');
+        expect(md(e)).toBe('```js\nxy\n```\n');
+    });
+
     it('plugin slices contribute commands, keymaps, input rules, inline kinds and transaction hooks', () => {
         const hook = vi.fn<(tr: Transaction) => Transaction | null>((tr) => tr);
         const plugin: EditorPlugin = {
