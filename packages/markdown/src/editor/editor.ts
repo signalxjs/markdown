@@ -158,10 +158,11 @@ export function createEditor(options: EditorOptions = {}): Editor {
     };
 
     const dispatch: Dispatch = (input) => {
-        let tr: Transaction | null = input;
+        let tr: Transaction = input;
         for (const hook of transactionHooks) {
-            tr = hook(tr, state);
-            if (!tr) return;
+            const next = hook(tr, state);
+            if (!next) return;
+            tr = next;
         }
         // External writes wait for an open composition to end.
         if (tr.meta.origin === 'external' && state.composing) {
