@@ -6,6 +6,8 @@ workspace shares one version line.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-12
+
 ### Added
 
 - `@sigx/markdown/editor` entry (#11) — the platform-neutral block-tree editor
