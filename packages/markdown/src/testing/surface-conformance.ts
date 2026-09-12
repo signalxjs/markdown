@@ -81,121 +81,127 @@ export function runInlineSurfaceConformance(h: ConformanceHarness): void {
     const settle = async (): Promise<void> => {
         await driver.settle?.();
     };
-    const make = (flat: InlineFlat, consume = true) => {
+    /** Create a surface for `flat`, run `body` against it, and always tear it down — on early return, a failed expectation or a throw alike. */
+    const using = async (flat: InlineFlat, body: (surface: InlineSurface, log: Recorded) => Promise<void>, consume = true): Promise<void> => {
         const r = recorder(consume);
         const surface = h.create({ key: 'b-0', blockType: 'paragraph', attrs: {}, flat, readOnly: false, events: r.events });
-        return { surface, log: r.log };
+        try {
+            await body(surface, r.log);
+        } finally {
+            h.cleanup?.(surface);
+        }
     };
     const plain = (text: string): InlineFlat => ({ text, spans: [] });
 
     it('renders the initial flat and reads it back unchanged', async () => {
         const flat: InlineFlat = { text: 'a b c', spans: [{ start: 2, end: 3, type: 'strong' }, { start: 4, end: 5, type: 'link', attrs: { url: 'u' } }] };
-        const { surface } = make(flat);
-        await settle();
-        expect(flatEquals(surface.getFlat(), flat)).toBe(true);
-        h.cleanup?.(surface);
+        await using(flat, async (surface) => {
+            await settle();
+            expect(flatEquals(surface.getFlat(), flat)).toBe(true);
+        });
     });
 
     it('setInline with equal content is a no-op that emits no change', async () => {
         const flat = plain('same');
-        const { surface, log } = make(flat);
-        await settle();
-        surface.setInline({ text: 'same', spans: [] });
-        await settle();
-        expect(log.changes.length).toBe(0);
-        expect(surface.getFlat().text).toBe('same');
-        h.cleanup?.(surface);
+        await using(flat, async (surface, log) => {
+            await settle();
+            surface.setInline({ text: 'same', spans: [] });
+            await settle();
+            expect(log.changes.length).toBe(0);
+            expect(surface.getFlat().text).toBe('same');
+        });
     });
 
     it('setInline with new content replaces it without emitting a change', async () => {
-        const { surface, log } = make(plain('old'));
-        await settle();
-        const next: InlineFlat = { text: 'new *x*', spans: [{ start: 4, end: 7, type: 'emphasis' }] };
-        surface.setInline(next);
-        await settle();
-        expect(flatEquals(surface.getFlat(), next)).toBe(true);
-        expect(log.changes.length).toBe(0);
-        h.cleanup?.(surface);
+        await using(plain('old'), async (surface, log) => {
+            await settle();
+            const next: InlineFlat = { text: 'new *x*', spans: [{ start: 4, end: 7, type: 'emphasis' }] };
+            surface.setInline(next);
+            await settle();
+            expect(flatEquals(surface.getFlat(), next)).toBe(true);
+            expect(log.changes.length).toBe(0);
+        });
     });
 
     it('typing emits a change whose flat matches the read-back', async () => {
-        const { surface, log } = make(plain('ab'));
-        await settle();
-        surface.focus({ offset: 1 });
-        await driver.type(surface, 'X');
-        await settle();
-        expect(log.changes.length).toBeGreaterThan(0);
-        const last = log.changes[log.changes.length - 1];
-        expect(last.flat.text).toBe('aXb');
-        expect(flatEquals(last.flat, surface.getFlat())).toBe(true);
-        expect(last.composing).toBe(false);
-        h.cleanup?.(surface);
+        await using(plain('ab'), async (surface, log) => {
+            await settle();
+            surface.focus({ offset: 1 });
+            await driver.type(surface, 'X');
+            await settle();
+            expect(log.changes.length).toBeGreaterThan(0);
+            const last = log.changes[log.changes.length - 1];
+            expect(last.flat.text).toBe('aXb');
+            expect(flatEquals(last.flat, surface.getFlat())).toBe(true);
+            expect(last.composing).toBe(false);
+        });
     });
 
     it('focus({offset}) then getSelection() agree', async () => {
-        const { surface } = make(plain('hello'));
-        await settle();
-        surface.focus({ offset: 3 });
-        await settle();
-        expect(surface.getSelection()).toEqual({ start: 3, end: 3 });
-        surface.setSelection({ start: 1, end: 4 });
-        await settle();
-        expect(surface.getSelection()).toEqual({ start: 1, end: 4 });
-        h.cleanup?.(surface);
+        await using(plain('hello'), async (surface) => {
+            await settle();
+            surface.focus({ offset: 3 });
+            await settle();
+            expect(surface.getSelection()).toEqual({ start: 3, end: 3 });
+            surface.setSelection({ start: 1, end: 4 });
+            await settle();
+            expect(surface.getSelection()).toEqual({ start: 1, end: 4 });
+        });
     });
 
     it('reports Enter and Backspace/Delete at the edges as boundary events', async () => {
-        const { surface, log } = make(plain('ab'));
-        await settle();
-        surface.focus({ offset: 0 });
-        await driver.press(surface, 'Backspace');
-        surface.focus({ offset: 2 });
-        await driver.press(surface, 'Delete');
-        await driver.press(surface, 'Enter');
-        await settle();
-        const keys = log.boundaries.map((b) => b.key);
-        expect(keys.includes('Backspace')).toBe(true);
-        expect(keys.includes('Delete')).toBe(true);
-        expect(keys.includes('Enter')).toBe(true);
-        // The text is untouched: the core consumed every boundary key.
-        expect(surface.getFlat().text).toBe('ab');
-        h.cleanup?.(surface);
+        await using(plain('ab'), async (surface, log) => {
+            await settle();
+            surface.focus({ offset: 0 });
+            await driver.press(surface, 'Backspace');
+            surface.focus({ offset: 2 });
+            await driver.press(surface, 'Delete');
+            await driver.press(surface, 'Enter');
+            await settle();
+            const keys = log.boundaries.map((b) => b.key);
+            expect(keys.includes('Backspace')).toBe(true);
+            expect(keys.includes('Delete')).toBe(true);
+            expect(keys.includes('Enter')).toBe(true);
+            // The text is untouched: the core consumed every boundary key.
+            expect(surface.getFlat().text).toBe('ab');
+        });
     });
 
     it('does not report Backspace away from the start as a boundary', async () => {
-        const { surface, log } = make(plain('ab'));
-        await settle();
-        surface.focus({ offset: 2 });
-        await driver.press(surface, 'Backspace');
-        await settle();
-        expect(log.boundaries.some((b) => b.key === 'Backspace')).toBe(false);
-        h.cleanup?.(surface);
+        await using(plain('ab'), async (surface, log) => {
+            await settle();
+            surface.focus({ offset: 2 });
+            await driver.press(surface, 'Backspace');
+            await settle();
+            expect(log.boundaries.some((b) => b.key === 'Backspace')).toBe(false);
+        });
     });
 
     it('never emits a non-composing change mid-composition', async () => {
-        if (!driver.compose) return;
-        const { surface, log } = make(plain('a'));
-        await settle();
-        surface.focus({ offset: 1 });
-        const ran = await driver.compose(surface, ['k', 'ka'], 'か');
-        await settle();
-        if (!ran) return;
-        expect(log.compositions.start).toBe(1);
-        expect(log.compositions.end.length).toBe(1);
-        expect(log.changes.every((c) => c.composing)).toBe(true);
-        expect(surface.getFlat().text).toBe('aか');
-        h.cleanup?.(surface);
+        const compose = driver.compose;
+        if (!compose) return;
+        await using(plain('a'), async (surface, log) => {
+            await settle();
+            surface.focus({ offset: 1 });
+            const ran = await compose(surface, ['k', 'ka'], 'か');
+            await settle();
+            if (!ran) return;
+            expect(log.compositions.start).toBe(1);
+            expect(log.compositions.end.length).toBe(1);
+            expect(log.changes.every((c) => c.composing)).toBe(true);
+            expect(surface.getFlat().text).toBe('aか');
+        });
     });
 
     it('setReadOnly blocks typing', async () => {
-        const { surface, log } = make(plain('ab'));
-        await settle();
-        surface.setReadOnly(true);
-        surface.focus({ offset: 1 });
-        await driver.type(surface, 'X');
-        await settle();
-        expect(surface.getFlat().text).toBe('ab');
-        expect(log.changes.length).toBe(0);
-        h.cleanup?.(surface);
+        await using(plain('ab'), async (surface, log) => {
+            await settle();
+            surface.setReadOnly(true);
+            surface.focus({ offset: 1 });
+            await driver.type(surface, 'X');
+            await settle();
+            expect(surface.getFlat().text).toBe('ab');
+            expect(log.changes.length).toBe(0);
+        });
     });
 }
