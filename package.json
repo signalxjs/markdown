@@ -1,6 +1,6 @@
 {
   "name": "sigx-markdown-monorepo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Markdown for SignalX — an mdast-compatible incremental parser, serializer, streaming, a renderer-neutral engine with a DOM view, and a block-tree editor for web and Lynx",
   "type": "module",
