@@ -140,9 +140,27 @@ export function serializeInline(
         } else if (i > 0 && parts[i][0] === '(' && isShortcutReference(children[i - 1]) && parts[i - 1].endsWith(']')) {
             // `[ref]` followed by `(`… would become an inline link.
             parts[i] = '\\' + parts[i];
+        } else if (children[i].type === 'link' && isBareAutolink(parts[i])) {
+            // A bare autolink literal only re-parses at a word boundary: glued
+            // to a preceding word (`see` + `https://x`) or followed by one it
+            // needs the angle form (or, for `www.`, a real link).
+            const before = i > 0 ? parts[i - 1].slice(-1) : undefined;
+            const after = i < n - 1 ? parts[i + 1][0] : undefined;
+            const boundaryBefore = before === undefined || /[\s(*_~]/.test(before);
+            const boundaryAfter = after === undefined || /[\s<)*_~]/.test(after);
+            if (!boundaryBefore || !boundaryAfter) {
+                const link = children[i] as Link;
+                parts[i] = /^https?:\/\//i.test(parts[i])
+                    ? '<' + parts[i] + '>'
+                    : '[' + escapeText(parts[i], false) + '](' + destination(link.url, link.title) + ')';
+            }
         }
     }
     return parts.join('');
+}
+
+function isBareAutolink(part: string): boolean {
+    return /^(?:https?:\/\/|www\.)[^\s<>]+$/i.test(part);
 }
 
 function isShortcutReference(node: Node): boolean {

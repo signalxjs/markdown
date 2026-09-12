@@ -466,3 +466,14 @@ describe('toMarkdown — plugins and unknown nodes', () => {
         expect(warn).toHaveBeenCalledTimes(2);
     });
 });
+
+describe('toMarkdown — bare autolinks need a word boundary', () => {
+    it('uses the angle form when a bare url is glued to a word', () => {
+        const auto = (url: string) => link(url, [url], null, true);
+        expect(md(p('see', auto('https://x')))).toBe('see<https://x>\n');
+        expect(md(p(auto('https://x'), 'now'))).toBe('<https://x>now\n');
+        expect(md(p('see ', auto('https://x')))).toBe('see https://x\n');
+        // The label is escaped like any text (a `www.` literal is neutralised); it decodes back on parse.
+        expect(md(p('go', link('http://www.x.com', ['www.x.com'], null, true)))).toBe('go[www&#x2E;x.com](http://www.x.com)\n');
+    });
+});

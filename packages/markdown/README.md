@@ -13,7 +13,8 @@ block-tree editor. Zero dependencies, no `node:` imports.
 | `@sigx/markdown/testing` | `strip()`, `toHtml()`, `feed()` — helpers for tests that parse, stream or render |
 | `@sigx/markdown/dom` | `MarkdownView` for the web, the default DOM components (`data-scope` / `data-part` styling seam) and the `CodeBlock` chrome |
 | `@sigx/markdown/shiki` | `createShikiHighlighter()` + `shikiCodeBlock()` — optional Shiki highlighting for code blocks (`shiki` is an optional peer) |
-| `@sigx/markdown/editor`, `./editor/dom` | the block-tree editor core and the web editor (planned) |
+| `@sigx/markdown/editor` | the block-tree editor core: `createEditor()`, state, steps, history, commands, keymap, input rules, triggers, toolbar items and the `InlineSurface` / `CodeSurface` contracts a platform implements |
+| `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web (next release) |
 
 ## Install
 

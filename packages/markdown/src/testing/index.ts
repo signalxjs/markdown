@@ -10,3 +10,7 @@ export { toHtml } from './html.js';
 export type { ToHtmlOptions } from './html.js';
 export { feed, seededChunks } from './feed.js';
 export type { FeedEngine } from './feed.js';
+export { createFakeInlineSurface, createFakeCodeSurface } from './fake-surface.js';
+export type { FakeInlineSurface, FakeCodeSurface, SurfaceCall } from './fake-surface.js';
+export { runInlineSurfaceConformance } from './surface-conformance.js';
+export type { ConformanceHarness, SurfaceDriver } from './surface-conformance.js';
