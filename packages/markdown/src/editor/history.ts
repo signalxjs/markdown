@@ -117,8 +117,10 @@ export function createHistory(options: HistoryOptions = {}): History {
             return entry;
         },
         peekInputRule() {
+            // The rule's entry is on top and its group is still open: no undo,
+            // redo, history/external transaction or blur since it was recorded.
             const last = done[done.length - 1];
-            return last?.inputRule && groupOpen !== undefined ? last : null;
+            return last?.inputRule && groupOpen ? last : null;
         },
         closeGroup() {
             groupOpen = false;

@@ -141,4 +141,23 @@ describe('history', () => {
         expect(history.peekInputRule()).toBeNull();
         expect(toMarkdown(state.doc)).toBe('# hi\n');
     });
+
+    it('peekInputRule is null once the group is closed or the entry was undone and redone', () => {
+        const rule = () => transaction([{ type: 'replaceBlock', key: 'b-0', node: { type: 'heading', depth: 1, children: [{ type: 'text', value: 'h' }] } }], { origin: 'inputRule', inputRule: 'heading', group: 'typing' });
+        let history = createHistory({ now: () => 0 });
+        let state = createState(parseMarkdown('# h'), textSelection('b-0', 1));
+        run(state, history, rule());
+        expect(history.peekInputRule()?.inputRule).toBe('heading');
+        history.closeGroup();
+        expect(history.peekInputRule()).toBeNull();
+
+        history = createHistory({ now: () => 0 });
+        state = createState(parseMarkdown('# h'), textSelection('b-0', 1));
+        state = run(state, history, rule());
+        state = undo(state, history);
+        expect(history.peekInputRule()).toBeNull();
+        redo(state, history);
+        expect(history.done[0]?.inputRule).toBe('heading');
+        expect(history.peekInputRule()).toBeNull();
+    });
 });
