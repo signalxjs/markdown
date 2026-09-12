@@ -11,8 +11,8 @@ block-tree editor. Zero dependencies, no `node:` imports.
 |---|---|
 | `@sigx/markdown` | the AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`, `toJSON` / `fromJSON`, `createMarkdownStream`, `renderDocument`, the `MarkdownPlugin` contract, `mentionPlugin` |
 | `@sigx/markdown/testing` | `strip()`, `toHtml()`, `feed()` — helpers for tests that parse, stream or render |
-| `@sigx/markdown/dom` | `MarkdownView` for the web (next release) |
-| `@sigx/markdown/shiki` | optional Shiki highlighting for code blocks (next release) |
+| `@sigx/markdown/dom` | `MarkdownView` for the web, the default DOM components (`data-scope` / `data-part` styling seam) and the `CodeBlock` chrome |
+| `@sigx/markdown/shiki` | `createShikiHighlighter()` + `shikiCodeBlock()` — optional Shiki highlighting for code blocks (`shiki` is an optional peer) |
 | `@sigx/markdown/editor`, `./editor/dom` | the block-tree editor core and the web editor (planned) |
 
 ## Install
@@ -41,6 +41,20 @@ a.children[0] === b.children[0];                             // true: finalized 
 
 Streaming: `createMarkdownStream({ flushIntervalMs: 16 })` coalesces tokens
 into one signal write per frame; pass `stream.value.value` to a view.
+
+```tsx
+import { MarkdownView } from '@sigx/markdown/dom';
+import { createShikiHighlighter, shikiCodeBlock } from '@sigx/markdown/shiki';
+
+const code = shikiCodeBlock(createShikiHighlighter());
+
+<MarkdownView value={stream.value.value} components={{ code }} onLink={(url) => router.push(url)} />
+```
+
+Every element carries `data-scope="markdown"` and `data-part="heading"`,
+`"code"`, `"link"`, … — style them with attribute selectors (the playground's
+`styles.css` is the reference stylesheet), or pass `classPrefix="md"` for
+`md-heading`-style classes, or replace any slot through `components`.
 
 ## Documentation
 

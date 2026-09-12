@@ -12,6 +12,8 @@ import type { ConfigEnv, UserConfig } from 'vite';
 const base = defineLibConfig({
     entry: {
         index: 'src/index.ts',
+        dom: 'src/dom/index.ts',
+        shiki: 'src/shiki/index.ts',
         testing: 'src/testing/index.ts'
     },
     external: [/@sigx\/.*/, /^shiki/, /^node:/],

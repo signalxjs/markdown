@@ -23,9 +23,12 @@ Full guides, API reference and live examples → **<https://sigx.dev/markdown/>*
 |---|---|
 | [`@sigx/markdown`](./packages/markdown) | An mdast-compatible AST, `parseMarkdown`, an incremental engine that keeps finalized blocks stable while a source string grows (built for token-by-token AI output), `toMarkdown`, `toJSON` / `fromJSON`, `createMarkdownStream`, and a renderer-neutral render engine with a plugin contract shared by parser, serializer, renderers and editor |
 | `@sigx/markdown/testing` | `strip()`, `toHtml()`, `feed()` — helpers for tests that parse, stream or render |
-| `@sigx/markdown/dom` | `MarkdownView` for the web — default components styled through `data-scope` / `data-part` attributes, optional Shiki highlighting via `@sigx/markdown/shiki` (next release) |
+| `@sigx/markdown/dom` | `MarkdownView` for the web — default components styled through `data-scope` / `data-part` attributes, a `CodeBlock` chrome with copy button |
+| `@sigx/markdown/shiki` | Optional Shiki highlighting for code blocks: `createShikiHighlighter()` + `shikiCodeBlock()` (`shiki` is an optional peer) |
 | `@sigx/markdown/editor` | The block-tree editor core: state, commands, history, keymap, input rules, triggers and the surface contract a platform implements (planned) |
 | `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web — a Notion-class block editor with toolbar, block menu, slash commands and mentions (planned) |
+
+Examples: [`examples/playground`](./examples/playground) — the view, streaming, plugins, Shiki and the serializer side by side, with a Playwright suite.
 
 Consumers: [`@sigx/lynx-markdown`](https://sigx.dev/lynx/modules/markdown/overview/) renders and edits the same trees natively on Lynx; [`@sigx/ai`](https://sigx.dev/ai/) chat UI streams assistant messages through it.
 
