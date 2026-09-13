@@ -8,6 +8,36 @@ workspace shares one version line.
 
 ### Changed
 
+- **Format-agnostic editor core** (#26, phase 4a of #19). `createEditor` takes
+  `format` (the primary format) and `formats` (further ones it reads); the
+  schema is the standard specs plus the formats' and plugins' `nodes`.
+  `Editor.setSource(source, formatId?)` replaces `setMarkdown`;
+  `Editor.paste(data: PasteData)` replaces `paste(text, markdown?)` — the
+  first format that reads a flavour present (`text`, `text/markdown`,
+  `text/html`, …) parses it, plain text falls back to `plainTextFormat`
+  (markdown lists `text/plain` last, so a markdown editor claims it);
+  `Editor.clipboard(root)` collects the plugins' clipboard writers.
+  `SurfacePasteEvent` is `{ data, range }` and `BridgeHost.paste(data)`; the
+  DOM surface reads every clipboard type. `EditorOptions.parse`, `blocksOf`
+  and `pasteText` are gone; `CommandContext` is `{ schema, formats, plugins }`.
+- Commands split into a generic core (`commands.ts`: no node type by name —
+  roles, `schema.defaultBlock` and the new spec flags `isolating`,
+  `collapsesWhenEmpty`, `moveAsUnit`) and the standard vocabulary
+  (`commands-standard.ts`: lists, quotes, tables, headings, links); `registry.ts`
+  names them all (the `commands` namespace and `commandRegistry` of the editor
+  entry). `splitBlock` = `chain(splitListItem, liftOutOfBlockquoteAtEnd,
+  splitTextBlock)` and `joinBackward` = `chain(joinBackwardInList,
+  liftOutOfBlockquoteAtStart, joinTextBackward)` reproduce the old
+  precedence; `chain()` is exported.
+- Input rules are a preset, not the core: `markdownPreset` (editor entry;
+  `markdownInputRules`, `markdownEnterRules`, a `text/markdown` clipboard
+  writer) replaces `baseInputRules` / `enterInputRules` / `TRIGGER_CHARS`. An
+  editor without it never interprets markdown syntax. `InputRule.triggers`
+  declares the characters that fire a rule (`triggerChars(rules)` unions
+  them); `EditorPluginSlice` gains `enterRules` and `clipboard`;
+  `applyEnterRules` takes the rules. `ToolbarState.ancestors` lists the
+  block's ancestor types.
+
 - **Formats and format-agnostic plugins** (#24, phase 3 of #19). A
   `DocumentFormat { id, mime, nodes?, parse, serialize, createIncrementalEngine? }`
   is the codec between source text and the one tree; `markdownFormat`

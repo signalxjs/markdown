@@ -27,6 +27,7 @@ import { defineProvide } from '@sigx/runtime-core';
 import type { Root } from '../../ast/index.js';
 import { createDomComponents, RichTextView, type DomComponents } from '../../dom/index.js';
 import { markdownFormat } from '../../markdown/index.js';
+import { markdownPreset } from '../markdown/index.js';
 import { parseMarkdown } from '../../parser/index.js';
 import type { RichTextPlugin } from '../../plugin/index.js';
 import { toMarkdown } from '../../serializer/index.js';
@@ -40,7 +41,7 @@ import { textSelection } from '../state.js';
 import type { ToolbarItem } from '../toolbar.js';
 import type { Transaction } from '../transaction.js';
 import { createTriggerSessionManager, type TriggerItem, type TriggerSelectApi, type TriggerSession, type TriggerSessionManager } from '../trigger/index.js';
-import { commands as commandRegistry } from '../commands.js';
+import { commands as commandRegistry } from '../registry.js';
 import { editorPart, flag } from './anatomy.js';
 import { BlockView } from './BlockView.js';
 import { BlockMenu } from './BlockMenu.js';
@@ -173,11 +174,11 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
 
     const editor = createEditor({
         doc: clone(props.document?.value ?? props.defaultDocument ?? parse(props.markdown?.value ?? props.defaultMarkdown ?? '')),
-        plugins,
+        plugins: [markdownPreset, ...plugins],
+        format: markdownFormat,
         keymap: { ArrowUp: focusNeighbour('up', offsetAt), ArrowDown: focusNeighbour('down', offsetAt), ...props.keymap },
         inputRules: props.inputRules,
         platform: { isMac: isMacPlatform(), hasHardwareKeyboard: true, caretRectSpace: 'editor' },
-        parse,
         readOnly: props.readOnly ?? false,
         onChange: ({ state, transaction }) => {
             const doc = state.doc;
@@ -212,7 +213,7 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
         (md) => {
             if (typeof md !== 'string' || md === lastEmittedMarkdown) return;
             lastEmittedMarkdown = md;
-            editor.setMarkdown(md);
+            editor.setSource(md, 'markdown');
         },
     );
     watch(
@@ -392,7 +393,7 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
         editor,
         getMarkdown: () => serialize(editor.state.doc),
         getDocument: () => editor.state.doc,
-        setMarkdown: (md) => void editor.setMarkdown(md),
+        setMarkdown: (md) => void editor.setSource(md, 'markdown'),
         setDocument: (doc) => editor.setDocument(clone(doc)),
         run: (command) => editor.run(command),
         focus: (target = 'end') => {

@@ -13,6 +13,8 @@ import { textSelection, blockSelection } from '../../src/editor/state.js';
 import { createFakeInlineSurface, createFakeCodeSurface, type FakeInlineSurface } from '../../src/testing/fake-surface.js';
 import type { Transaction } from '../../src/editor/transaction.js';
 import type { EditorPlugin } from '../../src/editor/plugin.js';
+import { markdownFormat } from '../../src/markdown/index.js';
+import { markdownPreset } from '../../src/editor/markdown/index.js';
 
 const md = (e: Editor) => toMarkdown(e.state.doc);
 
@@ -42,7 +44,7 @@ function mount(editor: Editor, key: string): FakeInlineSurface {
 }
 
 function make(markdown: string, extra: Parameters<typeof createEditor>[0] = {}): Editor {
-    return createEditor({ doc: parseMarkdown(markdown), parse: (s) => parseMarkdown(s), ...extra });
+    return createEditor({ doc: parseMarkdown(markdown), format: markdownFormat, plugins: [markdownPreset], ...extra });
 }
 
 describe('createEditor', () => {
@@ -184,7 +186,7 @@ describe('createEditor', () => {
         expect(md(e)).toBe('he\n\nllo\n');
     });
 
-    it('paste routes through the bridge to the markdown-aware paste', () => {
+    it('paste routes through the bridge to the format-aware paste', () => {
         const e = make('ab');
         const s = mount(e, 'b-0');
         s.focus({ offset: 1 });
@@ -259,7 +261,7 @@ describe('createEditor', () => {
             },
         };
         const parse = (s: string) => parseMarkdown(s, { plugins: [plugin] });
-        const e = createEditor({ doc: parse('hi @[Andy](u1)'), parse, plugins: [plugin] });
+        const e = createEditor({ doc: parse('hi @[Andy](u1)'), format: markdownFormat, plugins: [plugin] });
         expect(e.flatOf('b-0')!.spans).toEqual([{ start: 3, end: 4, type: 'mention', attrs: { id: 'u1', label: 'Andy' } }]);
         expect(e.runKey('Mod-Shift-1')).toBe(true);
         expect(toMarkdown(e.state.doc, { plugins: [plugin] })).toBe('!hi @[Andy](u1)\n');

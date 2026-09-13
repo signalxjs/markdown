@@ -4,12 +4,21 @@
  * apply (so a keymap can fall through) and, when given `dispatch`, submits
  * its transaction. Commands are pure: they read the state and produce steps;
  * surfaces and views never edit the tree themselves.
+ *
+ * This module is the format- and vocabulary-agnostic core: it knows roles,
+ * `schema.defaultBlock` and the spec flags (`isolating`, `collapsesWhenEmpty`,
+ * `moveAsUnit`, `splitsTo`), never a node type by name. The standard
+ * vocabulary's commands (lists, quotes, tables, headings, links) are in
+ * `commands-standard.ts`; `registry.ts` names them all.
  */
 
-import type { BlockContent, List, ListItem, PhrasingContent, Root, Table, TableCell, TableRow } from '../ast/index.js';
+import type { BlockContent, PhrasingContent, Root } from '../ast/index.js';
+import { plainTextFormat, type DocumentFormat } from '../document/index.js';
+import type { RichTextPlugin } from '../plugin/index.js';
+import type { NodeSpec, Schema } from '../schema/index.js';
 import type { InlineFlat } from './inline-flat.js';
-import { ATOM_CHAR, addMark, concatFlat, marksAt, removeMark, sliceFlat, toFlat, toInline, toggleMark as toggleFlatMark } from './inline-flat.js';
-import type { Schema } from '../schema/index.js';
+import { ATOM_CHAR, concatFlat, marksAt, sliceFlat, toFlat, toInline, toggleMark as toggleFlatMark } from './inline-flat.js';
+import { pickPasteFormat, type PasteData } from './paste.js';
 import type { BlockEntry, EditorBlock, EditorSelection, EditorState, TextSelection } from './state.js';
 import { blockSelection, normalizeDoc, selectionRange, textSelection } from './state.js';
 import type { Step } from './steps.js';
@@ -18,8 +27,10 @@ import type { Transaction, TransactionMeta } from './transaction.js';
 
 export interface CommandContext {
     schema: Schema;
-    /** Parse markdown into blocks (for paste and `setMarkdown`). Provided by the editor instance. */
-    parse?: (markdown: string) => Root;
+    /** The formats the editor reads: the primary one first (`setSource` without an id, and the first paste candidate). */
+    formats: readonly DocumentFormat[];
+    /** Plugins threaded into every parse. */
+    plugins?: readonly RichTextPlugin[];
 }
 
 export type Dispatch = (tr: Transaction) => void;
@@ -27,50 +38,62 @@ export type Dispatch = (tr: Transaction) => void;
 /** A command: inspect `state`, optionally dispatch, report applicability. */
 export type Command = (state: EditorState, dispatch: Dispatch | undefined, ctx: CommandContext) => boolean;
 
-const meta = (extra: Partial<TransactionMeta> = {}): TransactionMeta => ({ origin: 'command', ...extra });
+export const meta = (extra: Partial<TransactionMeta> = {}): TransactionMeta => ({ origin: 'command', ...extra });
+
+/** The first command that applies wins (the ProseMirror `chainCommands`). */
+export function chain(...commands: readonly Command[]): Command {
+    return (state, dispatch, ctx) => {
+        for (const command of commands) if (command(state, dispatch, ctx)) return true;
+        return false;
+    };
+}
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers (shared with the standard commands)
 // ---------------------------------------------------------------------------
 
-function textSel(state: EditorState): TextSelection | null {
+export function textSel(state: EditorState): TextSelection | null {
     return state.selection && state.selection.mode === 'text' ? state.selection : null;
 }
 
-function entryOf(state: EditorState, key: string): BlockEntry | undefined {
+export function entryOf(state: EditorState, key: string): BlockEntry | undefined {
     return state.index().get(key);
 }
 
-function inlineFlat(state: EditorState, key: string, ctx: CommandContext): InlineFlat | null {
+export function specOf(node: { type: string }, ctx: CommandContext): NodeSpec | undefined {
+    return ctx.schema.get(node.type);
+}
+
+export function inlineFlat(state: EditorState, key: string, ctx: CommandContext): InlineFlat | null {
     const entry = entryOf(state, key);
     if (!entry || ctx.schema.role(entry.node.type) !== 'textblock') return null;
     return flatOf(entry.node, ctx);
 }
 
-function isInline(state: EditorState, key: string, ctx: CommandContext): boolean {
+export function isTextBlock(state: EditorState, key: string, ctx: CommandContext): boolean {
     const entry = entryOf(state, key);
     return !!entry && ctx.schema.role(entry.node.type) === 'textblock';
 }
 
 /** First editable descendant of a block (or itself). */
-function firstEditable(node: EditorBlock, ctx: CommandContext): EditorBlock | undefined {
-    const kind = ctx.schema.role(node.type);
-    if (kind === 'textblock' || kind === 'code') return node;
+export function firstEditable(node: EditorBlock, ctx: CommandContext): EditorBlock | undefined {
+    const role = ctx.schema.role(node.type);
+    if (role === 'textblock' || role === 'code') return node;
     const spec = ctx.schema.get(node.type);
     if (spec?.entry) {
         const e = spec.entry(node);
         if (e) return firstEditable(e as EditorBlock, ctx);
     }
-    for (const child of ((node as { children?: EditorBlock[] }).children ?? [])) {
+    for (const child of (node as { children?: EditorBlock[] }).children ?? []) {
         const found = firstEditable(child, ctx);
         if (found) return found;
     }
     return undefined;
 }
 
-function lastEditable(node: EditorBlock, ctx: CommandContext): EditorBlock | undefined {
-    const kind = ctx.schema.role(node.type);
-    if (kind === 'textblock' || kind === 'code') return node;
+export function lastEditable(node: EditorBlock, ctx: CommandContext): EditorBlock | undefined {
+    const role = ctx.schema.role(node.type);
+    if (role === 'textblock' || role === 'code') return node;
     const children = (node as { children?: EditorBlock[] }).children ?? [];
     for (let i = children.length - 1; i >= 0; i--) {
         const found = lastEditable(children[i], ctx);
@@ -79,47 +102,73 @@ function lastEditable(node: EditorBlock, ctx: CommandContext): EditorBlock | und
     return undefined;
 }
 
-function lengthOf(node: EditorBlock, ctx: CommandContext): number {
-    const kind = ctx.schema.role(node.type);
-    if (kind === 'code') return (node as { value: string }).value.length;
-    if (kind === 'textblock') return toFlat((node as { children: PhrasingContent[] }).children, ctx.schema).text.length;
+export function lengthOf(node: EditorBlock, ctx: CommandContext): number {
+    const role = ctx.schema.role(node.type);
+    if (role === 'code') return (node as { value: string }).value.length;
+    if (role === 'textblock') return toFlat((node as { children: PhrasingContent[] }).children, ctx.schema).text.length;
     return 0;
 }
 
-function paragraph(children: PhrasingContent[] = []): BlockContent {
-    return { type: 'paragraph', children };
-}
-
-function listItem(children: BlockContent[], checked?: boolean | null): ListItem {
-    const item: ListItem = { type: 'listItem', spread: false, children };
-    if (checked !== undefined && checked !== null) item.checked = checked;
-    return item;
+/** An empty block of the schema's default type (a paragraph in the standard vocabulary). */
+export function defaultBlock(ctx: CommandContext, children: PhrasingContent[] = []): BlockContent {
+    const spec = ctx.schema.get(ctx.schema.defaultBlock);
+    return spec?.fromInline ? spec.fromInline(children) : ctx.schema.createBlock(ctx.schema.defaultBlock);
 }
 
 /** The key a node will have after `insertBlock` under `parentKey` at `index`. */
-function keyAt(parentKey: string | null, index: number): string {
+export function keyAt(parentKey: string | null, index: number): string {
     return parentKey === null ? `b-${index}` : `${parentKey}.${index}`;
 }
 
-/** The nearest ancestor (or self) entry of a given type. */
-function ancestor(state: EditorState, key: string, type: string): BlockEntry | undefined {
-    let cur = entryOf(state, key);
-    while (cur) {
-        if (cur.node.type === type) return cur;
-        if (cur.parentKey === null) return undefined;
-        cur = entryOf(state, cur.parentKey);
-    }
-    return undefined;
+/** A block's own attributes (everything but type, key, children, position, value). */
+export function ownAttrs(node: EditorBlock): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node)) if (k !== 'type' && k !== 'key' && k !== 'children' && k !== 'position' && k !== 'value') out[k] = v;
+    return out;
 }
 
-/** The list item and list around a block, when it lives directly in a list item's first paragraph. */
-function listContext(state: EditorState, key: string): { item: BlockEntry; list: BlockEntry; itemIndex: number } | null {
-    const entry = entryOf(state, key);
-    if (!entry || entry.parent.type !== 'listItem' || entry.index !== 0) return null;
-    const item = entryOf(state, entry.parentKey!)!;
-    if (item.parent.type !== 'list') return null;
-    const list = entryOf(state, item.parentKey!)!;
-    return { item, list, itemIndex: item.index };
+function isolating(type: string, ctx: CommandContext): boolean {
+    return ctx.schema.get(type)?.isolating === true;
+}
+
+/** Steps that remove a block, and its parent when that becomes empty and collapses (list items, lists, quotes). */
+export function removeSteps(state: EditorState, entry: BlockEntry, ctx: CommandContext): Step[] {
+    const siblings = (entry.parent as { children: EditorBlock[] }).children;
+    if (siblings.length === 1 && entry.parentKey !== null) {
+        const parent = entryOf(state, entry.parentKey)!;
+        if (ctx.schema.get(parent.node.type)?.collapsesWhenEmpty) return removeSteps(state, parent, ctx);
+    }
+    return [{ type: 'removeBlock', parentKey: entry.parentKey, index: entry.index }];
+}
+
+export function prevBlockOf(state: EditorState, entry: BlockEntry): BlockEntry | undefined {
+    if (entry.index > 0) {
+        const siblings = (entry.parent as { children: EditorBlock[] }).children;
+        return entryOf(state, siblings[entry.index - 1].key!);
+    }
+    return entry.parentKey === null ? undefined : prevBlockOf(state, entryOf(state, entry.parentKey)!);
+}
+
+/** The key `target` (a descendant of `node`, matched by identity) will have once `node` is keyed `key`. */
+export function relKey(key: string, node: EditorBlock | BlockContent, target: EditorBlock, ctx: CommandContext): string {
+    if ((node as EditorBlock) === target) return key;
+    const children = (node as { children?: EditorBlock[] }).children ?? [];
+    for (let i = 0; i < children.length; i++) {
+        if (!ctx.schema.isContainer(children[i].type) && children[i] !== target) continue;
+        const found = relKey(`${key}.${i}`, children[i], target, ctx);
+        if (found) return found;
+    }
+    return '';
+}
+
+export function stripKeys<T>(node: T): T {
+    return JSON.parse(JSON.stringify(node, (k, v) => (k === 'key' || k === 'position' ? undefined : v)));
+}
+
+export function topLevelOf(state: EditorState, entry: BlockEntry): BlockEntry {
+    let cur = entry;
+    while (cur.parentKey !== null) cur = entryOf(state, cur.parentKey)!;
+    return cur;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +197,15 @@ export const insertText =
         const flat = inlineFlat(state, key, ctx);
         if (!flat) return false;
         const marks = marksAt(flat, from, to, ctx.schema);
-        const slice: InlineFlat = { text, spans: text ? marks.filter((m) => m !== 'link' || from < to).map((type) => ({ start: 0, end: text.length, type, attrs: flat.spans.find((s) => s.type === type)?.attrs })) : [] };
+        // A mark that carries attrs (a link) is inherited only when text is replaced, never extended from a caret.
+        const slice: InlineFlat = {
+            text,
+            spans: text
+                ? marks
+                      .filter((m) => from < to || !flat.spans.find((s) => s.type === m)?.attrs)
+                      .map((type) => ({ start: 0, end: text.length, type, attrs: flat.spans.find((s) => s.type === type)?.attrs }))
+                : [],
+        };
         for (const s of slice.spans) if (!s.attrs) delete s.attrs;
         dispatch?.({
             steps: [{ type: 'replaceInline', key, from, to, slice }],
@@ -162,7 +219,7 @@ export const insertText =
 export const replaceRange =
     (key: string, from: number, to: number, slice: InlineFlat, opts: { group?: string } = {}): Command =>
     (state, dispatch, ctx) => {
-        if (!isInline(state, key, ctx)) return false;
+        if (!isTextBlock(state, key, ctx)) return false;
         dispatch?.({
             steps: [{ type: 'replaceInline', key, from, to, slice }],
             selection: textSelection(key, from + slice.text.length),
@@ -186,43 +243,6 @@ export const toggleMark =
         return true;
     };
 
-export const setLink =
-    (url: string, title?: string): Command =>
-    (state, dispatch, ctx) => {
-        const sel = textSel(state);
-        if (!sel) return false;
-        const { from, to } = selectionRange(sel);
-        const flat = inlineFlat(state, sel.anchor.key, ctx);
-        if (!flat) return false;
-        const attrs: Record<string, string> = { url };
-        if (title) attrs.title = title;
-        if (from === to) {
-            // No selection: insert the url as its own linked text, as an autolink (`<url>`).
-            const slice: InlineFlat = { text: url, spans: [{ start: 0, end: url.length, type: 'link', attrs: { ...attrs, autolink: 'true' } }] };
-            dispatch?.({ steps: [{ type: 'replaceInline', key: sel.anchor.key, from, to, slice }], selection: textSelection(sel.anchor.key, from + url.length), meta: meta() });
-            return true;
-        }
-        const next = addMark(removeMark(flat, 'link', from, to), 'link', from, to, attrs);
-        dispatch?.({ steps: [{ type: 'setInline', key: sel.anchor.key, flat: next }], selection: sel, meta: meta() });
-        return true;
-    };
-
-export const unsetLink: Command = (state, dispatch, ctx) => {
-    const sel = textSel(state);
-    if (!sel) return false;
-    const flat = inlineFlat(state, sel.anchor.key, ctx);
-    if (!flat) return false;
-    let { from, to } = selectionRange(sel);
-    if (from === to) {
-        const span = flat.spans.find((s) => s.type === 'link' && s.start <= from && s.end >= from);
-        if (!span) return false;
-        from = span.start;
-        to = span.end;
-    }
-    dispatch?.({ steps: [{ type: 'setInline', key: sel.anchor.key, flat: removeMark(flat, 'link', from, to) }], selection: sel, meta: meta() });
-    return true;
-};
-
 /** Insert an atom (image, mention, …) at the selection, replacing it. */
 export const insertAtom =
     (type: string, attrs: Record<string, string>, replace?: { from: number; to: number }): Command =>
@@ -230,7 +250,7 @@ export const insertAtom =
         const sel = textSel(state);
         if (!sel) return false;
         const key = sel.anchor.key;
-        if (!isInline(state, key, ctx)) return false;
+        if (!isTextBlock(state, key, ctx)) return false;
         const { from, to } = replace ?? selectionRange(sel);
         const slice: InlineFlat = { text: ATOM_CHAR, spans: [{ start: 0, end: 1, type, attrs }] };
         dispatch?.({ steps: [{ type: 'replaceInline', key, from, to, slice }], selection: textSelection(key, from + 1), meta: meta() });
@@ -250,98 +270,47 @@ export const insertHardBreak: Command = (state, dispatch, ctx) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Enter: split the block at the caret. An empty list item outdents (or becomes
- * a paragraph at the top level); an empty trailing paragraph in a blockquote
- * lifts out; a heading splits into a paragraph; a code block inserts a newline
- * (leave it with `exitCode`).
+ * Enter in a text block: split it at the caret. The tail becomes a block of
+ * the same type (or `splitsTo` at the end — a heading yields a paragraph);
+ * a code block inserts a newline (leave it with `exitCode`); an isolating
+ * block (a table cell) never splits. The standard vocabulary's list and
+ * quote behaviour runs first through `splitBlock` in `commands-standard.ts`.
  */
-export const splitBlock: Command = (state, dispatch, ctx) => {
+export const splitTextBlock: Command = (state, dispatch, ctx) => {
     const sel = textSel(state);
     if (!sel) return false;
     const key = sel.anchor.key;
     const entry = entryOf(state, key);
     if (!entry) return false;
-    const kind = ctx.schema.role(entry.node.type);
-    if (kind === 'code') return insertText('\n')(state, dispatch, ctx);
-    if (kind !== 'textblock') return false;
+    const role = ctx.schema.role(entry.node.type);
+    if (role === 'code') return insertText('\n')(state, dispatch, ctx);
+    if (role !== 'textblock' || isolating(entry.node.type, ctx)) return false;
     const flat = inlineFlat(state, key, ctx)!;
     const { from, to } = selectionRange(sel);
-
-    // Empty list item: outdent / lift to a paragraph.
-    const lc = listContext(state, key);
-    if (lc && flat.text.length === 0 && (lc.item.node as ListItem).children.length === 1) {
-        return outdentListItem(state, dispatch, ctx) || liftEmptyItem(state, dispatch, ctx, lc);
-    }
-    // Empty last paragraph in a blockquote: lift out.
-    if (flat.text.length === 0 && entry.parent.type === 'blockquote' && entry.index === (entry.parent as { children: unknown[] }).children.length - 1) {
-        return liftOutOfBlockquote(state, dispatch, ctx);
-    }
-    // Table cells never split.
-    if (entry.node.type === 'tableCell') return false;
-
     const head = sliceFlat(flat, 0, from);
     const tail = sliceFlat(flat, to, flat.text.length);
     const spec = ctx.schema.get(entry.node.type)!;
     const atEnd = to === flat.text.length;
     const nextType = atEnd && spec.splitsTo ? spec.splitsTo : entry.node.type;
-    const nextSpec = ctx.schema.get(nextType)!;
+    const nextSpec = ctx.schema.get(nextType);
+    if (!nextSpec?.fromInline) return false;
     const attrs = nextType === entry.node.type ? ownAttrs(entry.node) : {};
-    const nextNode = nextSpec.fromInline!(toInline(tail, ctx.schema), attrs);
-
-    const steps: Step[] = [];
-    let newKey: string;
-    if (lc) {
-        // Split the list item: the new paragraph starts a new item carrying the rest of the old item's blocks.
-        const item = lc.item.node as ListItem;
-        const rest = item.children.slice(1);
-        const checked = item.checked;
-        steps.push({ type: 'setInline', key, flat: head });
-        if (rest.length) {
-            steps.push({ type: 'replaceBlock', key: item.key!, node: listItem([item.children[0]], checked) });
-        }
-        steps.push({ type: 'insertBlock', parentKey: lc.list.node.key!, index: lc.itemIndex + 1, node: listItem([nextNode as BlockContent, ...rest], checked === undefined ? undefined : false) });
-        newKey = `${keyAt(lc.list.node.key!, lc.itemIndex + 1)}.0`;
-    } else {
-        steps.push({ type: 'setInline', key, flat: head });
-        steps.push({ type: 'insertBlock', parentKey: entry.parentKey, index: entry.index + 1, node: nextNode as EditorBlock });
-        newKey = keyAt(entry.parentKey, entry.index + 1);
-    }
-    dispatch?.({ steps, selection: textSelection(newKey, 0), meta: meta() });
+    const nextNode = nextSpec.fromInline(toInline(tail, ctx.schema), attrs);
+    const steps: Step[] = [
+        { type: 'setInline', key, flat: head },
+        { type: 'insertBlock', parentKey: entry.parentKey, index: entry.index + 1, node: nextNode as EditorBlock },
+    ];
+    dispatch?.({ steps, selection: textSelection(keyAt(entry.parentKey, entry.index + 1), 0), meta: meta() });
     return true;
 };
 
-function ownAttrs(node: EditorBlock): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(node)) if (k !== 'type' && k !== 'key' && k !== 'children' && k !== 'position' && k !== 'value') out[k] = v;
-    return out;
-}
-
-function liftEmptyItem(state: EditorState, dispatch: Dispatch | undefined, ctx: CommandContext, lc: NonNullable<ReturnType<typeof listContext>>): boolean {
-    // Top-level list: turn the item into a paragraph after the list (splitting the list when the item is in the middle).
-    const list = lc.list.node as List;
-    const before = list.children.slice(0, lc.itemIndex);
-    const after = list.children.slice(lc.itemIndex + 1);
-    const steps: Step[] = [];
-    const listEntry = lc.list;
-    const at = listEntry.index;
-    if (before.length === 0 && after.length === 0) {
-        steps.push({ type: 'replaceBlock', key: list.key!, node: paragraph() });
-        dispatch?.({ steps, selection: textSelection(list.key!, 0), meta: meta() });
-        return true;
-    }
-    if (before.length) steps.push({ type: 'replaceBlock', key: list.key!, node: { ...list, children: before } });
-    else steps.push({ type: 'removeBlock', parentKey: listEntry.parentKey, index: at });
-    const insertAt = before.length ? at + 1 : at;
-    steps.push({ type: 'insertBlock', parentKey: listEntry.parentKey, index: insertAt, node: paragraph() });
-    if (after.length) steps.push({ type: 'insertBlock', parentKey: listEntry.parentKey, index: insertAt + 1, node: { ...list, children: after } });
-    void ctx;
-    void state;
-    dispatch?.({ steps, selection: textSelection(keyAt(listEntry.parentKey, insertAt), 0), meta: meta() });
-    return true;
-}
-
-/** Backspace at offset 0: join with the previous editable block, or lift a list item / quote paragraph. */
-export const joinBackward: Command = (state, dispatch, ctx) => {
+/**
+ * Backspace at offset 0: a text block of another type first becomes the
+ * default block; then the block joins the previous editable one (a void
+ * block before it is selected instead; a code block before it takes the
+ * caret at its end). Isolating blocks never join.
+ */
+export const joinTextBackward: Command = (state, dispatch, ctx) => {
     const sel = textSel(state);
     if (!sel) return false;
     const { from, to } = selectionRange(sel);
@@ -349,17 +318,11 @@ export const joinBackward: Command = (state, dispatch, ctx) => {
     const key = sel.anchor.key;
     const entry = entryOf(state, key);
     if (!entry) return false;
-    const kind = ctx.schema.role(entry.node.type);
-    if (kind !== 'textblock' && kind !== 'code') return false;
+    const role = ctx.schema.role(entry.node.type);
+    if (role !== 'textblock' && role !== 'code') return false;
+    if (isolating(entry.node.type, ctx)) return false;
 
-    // A non-paragraph inline block first becomes a paragraph.
-    if (entry.node.type !== 'paragraph' && entry.node.type !== 'tableCell') {
-        return setBlockType('paragraph')(state, dispatch, ctx);
-    }
-    if (entry.node.type === 'tableCell') return false;
-    const lc = listContext(state, key);
-    if (lc) return outdentListItem(state, dispatch, ctx) || liftEmptyItemWithContent(state, dispatch, ctx, lc);
-    if (entry.parent.type === 'blockquote' && entry.index === 0) return liftOutOfBlockquote(state, dispatch, ctx);
+    if (entry.node.type !== ctx.schema.defaultBlock) return setBlockType(ctx.schema.defaultBlock)(state, dispatch, ctx);
 
     // A void block right before this one is selected instead of merged into.
     const prevTop = prevBlockOf(state, entry);
@@ -378,49 +341,10 @@ export const joinBackward: Command = (state, dispatch, ctx) => {
     const prevFlat = flatOf(prev.node, ctx);
     const flat = inlineFlat(state, key, ctx)!;
     const merged = concatFlat(prevFlat, flat);
-    const steps: Step[] = [{ type: 'setInline', key: prevKey, flat: merged }, ...removeSteps(state, entry)];
+    const steps: Step[] = [{ type: 'setInline', key: prevKey, flat: merged }, ...removeSteps(state, entry, ctx)];
     dispatch?.({ steps, selection: textSelection(prevKey, prevFlat.text.length), meta: meta() });
     return true;
 };
-
-function prevBlockOf(state: EditorState, entry: BlockEntry): BlockEntry | undefined {
-    if (entry.index > 0) {
-        const siblings = (entry.parent as { children: EditorBlock[] }).children;
-        return entryOf(state, siblings[entry.index - 1].key!);
-    }
-    return entry.parentKey === null ? undefined : prevBlockOf(state, entryOf(state, entry.parentKey)!);
-}
-
-/** Steps that remove a block, and its parent when that becomes empty (list items, lists, quotes). */
-function removeSteps(state: EditorState, entry: BlockEntry): Step[] {
-    const siblings = (entry.parent as { children: EditorBlock[] }).children;
-    if (siblings.length === 1 && entry.parentKey !== null) {
-        const parent = entryOf(state, entry.parentKey)!;
-        if (parent.node.type === 'listItem' || parent.node.type === 'list' || parent.node.type === 'blockquote') return removeSteps(state, parent);
-    }
-    return [{ type: 'removeBlock', parentKey: entry.parentKey, index: entry.index }];
-}
-
-function liftEmptyItemWithContent(state: EditorState, dispatch: Dispatch | undefined, ctx: CommandContext, lc: NonNullable<ReturnType<typeof listContext>>): boolean {
-    // Top-level item with content: the item becomes a paragraph (+ its other blocks) after the preceding items.
-    const list = lc.list.node as List;
-    const item = lc.item.node as ListItem;
-    const before = list.children.slice(0, lc.itemIndex);
-    const after = list.children.slice(lc.itemIndex + 1);
-    const listEntry = lc.list;
-    const at = listEntry.index;
-    const steps: Step[] = [];
-    if (before.length) steps.push({ type: 'replaceBlock', key: list.key!, node: { ...list, children: before } });
-    else steps.push({ type: 'removeBlock', parentKey: listEntry.parentKey, index: at });
-    let insertAt = before.length ? at + 1 : at;
-    const firstKey = keyAt(listEntry.parentKey, insertAt);
-    for (const child of item.children) steps.push({ type: 'insertBlock', parentKey: listEntry.parentKey, index: insertAt++, node: child });
-    if (after.length) steps.push({ type: 'insertBlock', parentKey: listEntry.parentKey, index: insertAt, node: { ...list, children: after } });
-    void state;
-    void ctx;
-    dispatch?.({ steps, selection: textSelection(firstKey, 0), meta: meta() });
-    return true;
-}
 
 /** Delete at the end: join the next editable block into this one. */
 export const joinForward: Command = (state, dispatch, ctx) => {
@@ -435,17 +359,17 @@ export const joinForward: Command = (state, dispatch, ctx) => {
     const nextKey = state.index().nextEditable(key);
     if (!nextKey) return false;
     const next = entryOf(state, nextKey)!;
-    if (ctx.schema.role(next.node.type) !== 'textblock' || next.node.type === 'tableCell') {
+    if (ctx.schema.role(next.node.type) !== 'textblock' || isolating(next.node.type, ctx)) {
         dispatch?.({ steps: [], selection: textSelection(nextKey, 0), meta: meta() });
         return true;
     }
     const merged = concatFlat(flat, flatOf(next.node, ctx));
-    const steps: Step[] = [{ type: 'setInline', key, flat: merged }, ...removeSteps(state, next)];
+    const steps: Step[] = [{ type: 'setInline', key, flat: merged }, ...removeSteps(state, next, ctx)];
     dispatch?.({ steps, selection: textSelection(key, flat.text.length), meta: meta() });
     return true;
 };
 
-/** Convert the current block (or every block in a block selection) to another inline/code type. */
+/** Convert the current block (or every block in a block selection) to another text/code type. */
 export const setBlockType =
     (type: string, attrs?: Record<string, unknown>): Command =>
     (state, dispatch, ctx) => {
@@ -458,8 +382,7 @@ export const setBlockType =
             const entry = entryOf(state, key);
             if (!entry) continue;
             const source = ctx.schema.get(entry.node.type);
-            if (!source?.toInline) continue;
-            if (entry.node.type === 'tableCell') continue;
+            if (!source?.toInline || isolating(entry.node.type, ctx)) continue;
             if (entry.node.type === type) {
                 if (attrs) steps.push({ type: 'setAttrs', key, attrs });
                 continue;
@@ -477,8 +400,8 @@ function clampSelection(sel: TextSelection, state: EditorState, ctx: CommandCont
     // Keep the caret; the surface clamps on its side too. Hard breaks may vanish (heading), so clamp offsets.
     const entry = entryOf(state, sel.anchor.key);
     if (!entry) return sel;
-    const kind = ctx.schema.role(targetType);
-    const len = kind === 'code' ? (ctx.schema.get(entry.node.type)?.toInline?.(entry.node) ?? []).reduce((n, c) => n + ((c as { value?: string }).value?.length ?? 1), 0) : Infinity;
+    const role = ctx.schema.role(targetType);
+    const len = role === 'code' ? (ctx.schema.get(entry.node.type)?.toInline?.(entry.node) ?? []).reduce((n, c) => n + ((c as { value?: string }).value?.length ?? 1), 0) : Infinity;
     return { mode: 'text', anchor: { key: sel.anchor.key, offset: Math.min(sel.anchor.offset, len) }, head: { key: sel.head.key, offset: Math.min(sel.head.offset, len) } };
 }
 
@@ -495,171 +418,6 @@ export function selectedBlockKeys(state: EditorState): string[] {
     return siblings.slice(from, to + 1).map((n) => n.key!);
 }
 
-export type ListKind = 'bullet' | 'ordered' | 'task';
-
-function listKindOf(list: List, item: ListItem): ListKind {
-    if (item.checked !== undefined && item.checked !== null) return 'task';
-    return list.ordered ? 'ordered' : 'bullet';
-}
-
-/** Wrap the current paragraph(s) in a list of `kind`, change the kind, or unwrap when already that kind. */
-export const toggleList =
-    (kind: ListKind): Command =>
-    (state, dispatch, ctx) => {
-        const keys = selectedBlockKeys(state);
-        if (!keys.length) return false;
-        const first = entryOf(state, keys[0]);
-        if (!first) return false;
-        const lc = listContext(state, keys[0]);
-        if (lc) {
-            const list = lc.list.node as List;
-            const current = listKindOf(list, lc.item.node as ListItem);
-            if (current === kind) return liftEmptyItemWithContent(state, dispatch, ctx, lc);
-            // Change the kind of the whole list.
-            const steps: Step[] = [{ type: 'setAttrs', key: list.key!, attrs: { ordered: kind === 'ordered', start: kind === 'ordered' ? 1 : null } }];
-            for (const item of list.children) {
-                steps.push({ type: 'setAttrs', key: item.key!, attrs: { checked: kind === 'task' ? item.checked ?? false : undefined } });
-            }
-            dispatch?.({ steps, selection: state.selection, meta: meta() });
-            return true;
-        }
-        // Wrap: consecutive selected siblings become one list.
-        const entries = keys.map((k) => entryOf(state, k)).filter((e): e is BlockEntry => !!e && ctx.schema.role(e.node.type) === 'textblock' && e.node.type !== 'tableCell');
-        if (!entries.length) return false;
-        const parentKey = entries[0].parentKey;
-        const startIndex = entries[0].index;
-        const items = entries.map((e) => listItem([e.node as BlockContent], kind === 'task' ? false : undefined));
-        const list: List = { type: 'list', ordered: kind === 'ordered', spread: false, children: items };
-        if (kind === 'ordered') list.start = 1;
-        const steps: Step[] = [];
-        for (let i = entries.length - 1; i >= 0; i--) steps.push({ type: 'removeBlock', parentKey, index: entries[i].index });
-        steps.push({ type: 'insertBlock', parentKey, index: startIndex, node: list });
-        const sel = state.selection;
-        const listKey = keyAt(parentKey, startIndex);
-        const selection: EditorSelection =
-            sel && sel.mode === 'text'
-                ? { mode: 'text', anchor: { key: `${listKey}.0.0`, offset: sel.anchor.offset }, head: { key: `${listKey}.0.0`, offset: sel.head.offset } }
-                : blockSelection(listKey);
-        dispatch?.({ steps, selection, meta: meta() });
-        return true;
-    };
-
-/** Tab in a list item: nest it under the previous item. */
-export const indentListItem: Command = (state, dispatch, ctx) => {
-    const sel = textSel(state);
-    if (!sel) return false;
-    const lc = listContext(state, sel.anchor.key);
-    if (!lc || lc.itemIndex === 0) return false;
-    const list = lc.list.node as List;
-    const prev = list.children[lc.itemIndex - 1];
-    const item = lc.item.node as ListItem;
-    const nested = prev.children[prev.children.length - 1];
-    const steps: Step[] = [];
-    let newKey: string;
-    if (nested && nested.type === 'list') {
-        // Append to the previous item's existing sub-list.
-        steps.push({ type: 'removeBlock', parentKey: list.key!, index: lc.itemIndex });
-        const prevKeyAfter = prev.key!;
-        const subKey = nested.key!;
-        steps.push({ type: 'insertBlock', parentKey: subKey, index: (nested as List).children.length, node: item });
-        newKey = `${keyAt(subKey, (nested as List).children.length)}.0`;
-        void prevKeyAfter;
-    } else {
-        steps.push({ type: 'removeBlock', parentKey: list.key!, index: lc.itemIndex });
-        const sub: List = { type: 'list', ordered: list.ordered, spread: false, children: [item] };
-        if (list.ordered) sub.start = 1;
-        steps.push({ type: 'insertBlock', parentKey: prev.key!, index: prev.children.length, node: sub });
-        newKey = `${keyAt(prev.key!, prev.children.length)}.0.0`;
-    }
-    void ctx;
-    dispatch?.({ steps, selection: { mode: 'text', anchor: { key: newKey, offset: sel.anchor.offset }, head: { key: newKey, offset: sel.head.offset } }, meta: meta() });
-    return true;
-};
-
-/** Shift-Tab in a nested list item: move it after its parent item (taking following siblings along as a sub-list). */
-export const outdentListItem: Command = (state, dispatch, ctx) => {
-    const sel = textSel(state);
-    if (!sel) return false;
-    const lc = listContext(state, sel.anchor.key);
-    if (!lc) return false;
-    const list = lc.list.node as List;
-    const listEntry = lc.list;
-    if (listEntry.parent.type !== 'listItem') return false;
-    const parentItem = entryOf(state, listEntry.parentKey!)!;
-    const grandList = entryOf(state, parentItem.parentKey!)!;
-    const item = lc.item.node as ListItem;
-    const after = list.children.slice(lc.itemIndex + 1);
-    const before = list.children.slice(0, lc.itemIndex);
-    const steps: Step[] = [];
-    // Rebuild the parent item: keep its blocks, with the sub-list trimmed to `before` (or removed).
-    const parentChildren = (parentItem.node as ListItem).children.slice();
-    const subIndex = listEntry.index;
-    if (before.length) parentChildren[subIndex] = { ...list, children: before };
-    else parentChildren.splice(subIndex, 1);
-    steps.push({ type: 'replaceBlock', key: parentItem.node.key!, node: { ...(parentItem.node as ListItem), children: parentChildren } });
-    // The outdented item carries the following siblings as its own sub-list.
-    const moved: ListItem = after.length ? { ...item, children: [...item.children, { ...list, children: after }] } : item;
-    steps.push({ type: 'insertBlock', parentKey: grandList.node.key!, index: parentItem.index + 1, node: moved });
-    const newKey = `${keyAt(grandList.node.key!, parentItem.index + 1)}.0`;
-    void ctx;
-    dispatch?.({ steps, selection: { mode: 'text', anchor: { key: newKey, offset: sel.anchor.offset }, head: { key: newKey, offset: sel.head.offset } }, meta: meta() });
-    return true;
-};
-
-export const toggleTaskChecked =
-    (key?: string): Command =>
-    (state, dispatch) => {
-        const target = key ?? (state.selection?.mode === 'text' ? state.selection.anchor.key : state.selection?.anchorKey);
-        if (!target) return false;
-        const item = ancestor(state, target, 'listItem');
-        if (!item) return false;
-        const node = item.node as ListItem;
-        if (node.checked === undefined || node.checked === null) return false;
-        dispatch?.({ steps: [{ type: 'setAttrs', key: node.key!, attrs: { checked: !node.checked } }], selection: state.selection, meta: meta() });
-        return true;
-    };
-
-export const wrapInBlockquote: Command = (state, dispatch) => {
-    const keys = selectedBlockKeys(state);
-    if (!keys.length) return false;
-    const entries = keys.map((k) => entryOf(state, k)).filter((e): e is BlockEntry => !!e);
-    if (!entries.length || entries[0].parent.type === 'blockquote') return false;
-    const parentKey = entries[0].parentKey;
-    const startIndex = entries[0].index;
-    const steps: Step[] = [];
-    for (let i = entries.length - 1; i >= 0; i--) steps.push({ type: 'removeBlock', parentKey, index: entries[i].index });
-    steps.push({ type: 'insertBlock', parentKey, index: startIndex, node: { type: 'blockquote', children: entries.map((e) => e.node as BlockContent) } });
-    const qKey = keyAt(parentKey, startIndex);
-    const sel = state.selection;
-    const selection: EditorSelection = sel && sel.mode === 'text' ? { mode: 'text', anchor: { key: `${qKey}.0`, offset: sel.anchor.offset }, head: { key: `${qKey}.0`, offset: sel.head.offset } } : blockSelection(qKey);
-    dispatch?.({ steps, selection, meta: meta() });
-    return true;
-};
-
-export const liftOutOfBlockquote: Command = (state, dispatch) => {
-    const keys = selectedBlockKeys(state);
-    if (!keys.length) return false;
-    const entry = entryOf(state, keys[0]);
-    if (!entry || entry.parent.type !== 'blockquote') return false;
-    const quote = entryOf(state, entry.parentKey!)!;
-    const children = (quote.node as { children: BlockContent[] }).children;
-    const before = children.slice(0, entry.index);
-    const lifted = children.slice(entry.index, entry.index + keys.length);
-    const after = children.slice(entry.index + keys.length);
-    const steps: Step[] = [];
-    const at = quote.index;
-    if (before.length) steps.push({ type: 'replaceBlock', key: quote.node.key!, node: { type: 'blockquote', children: before } });
-    else steps.push({ type: 'removeBlock', parentKey: quote.parentKey, index: at });
-    let insertAt = before.length ? at + 1 : at;
-    const firstKey = keyAt(quote.parentKey, insertAt);
-    for (const node of lifted) steps.push({ type: 'insertBlock', parentKey: quote.parentKey, index: insertAt++, node });
-    if (after.length) steps.push({ type: 'insertBlock', parentKey: quote.parentKey, index: insertAt, node: { type: 'blockquote', children: after } });
-    const sel = state.selection;
-    const selection: EditorSelection = sel && sel.mode === 'text' ? { mode: 'text', anchor: { key: firstKey, offset: sel.anchor.offset }, head: { key: firstKey, offset: sel.head.offset } } : blockSelection(firstKey);
-    dispatch?.({ steps, selection, meta: meta() });
-    return true;
-};
-
 /** Insert a block after the current one and move the caret into it (or select it when void). */
 export const insertBlockAfter =
     (node: BlockContent, opts: { replaceEmpty?: boolean } = { replaceEmpty: true }): Command =>
@@ -668,12 +426,14 @@ export const insertBlockAfter =
         if (!keys.length) return false;
         const entry = entryOf(state, keys[keys.length - 1]);
         if (!entry) return false;
-        // A top-level ancestor when inside a table cell / list item: insert after the enclosing block.
+        // Inside an isolating structure (a table): insert after the enclosing block.
         let target = entry;
-        while (target.parent.type === 'tableRow' || target.parent.type === 'table' || (target.node.type === 'tableCell')) target = entryOf(state, target.parentKey!)!;
+        while (target.parentKey !== null && (isolating(target.parent.type, ctx) || (isolating(target.node.type, ctx) && ctx.schema.isEditable(target.node.type)))) {
+            target = entryOf(state, target.parentKey)!;
+        }
         const steps: Step[] = [];
         let key: string;
-        const empty = ctx.schema.role(target.node.type) === 'textblock' && lengthOf(target.node, ctx) === 0 && target.node.type === 'paragraph';
+        const empty = target.node.type === ctx.schema.defaultBlock && lengthOf(target.node, ctx) === 0;
         if (opts.replaceEmpty && empty) {
             steps.push({ type: 'replaceBlock', key: target.node.key!, node });
             key = target.node.key!;
@@ -681,9 +441,9 @@ export const insertBlockAfter =
             steps.push({ type: 'insertBlock', parentKey: target.parentKey, index: target.index + 1, node });
             key = keyAt(target.parentKey, target.index + 1);
         }
-        const kind = ctx.schema.role(node.type);
+        const role = ctx.schema.role(node.type);
         let selection: EditorSelection;
-        if (kind === 'void') selection = blockSelection(key);
+        if (role === 'void') selection = blockSelection(key);
         else {
             const keyed = { ...node, key } as EditorBlock;
             const first = firstEditable(keyed, ctx);
@@ -693,89 +453,6 @@ export const insertBlockAfter =
         return true;
     };
 
-/** The key `target` (a descendant of `node`, matched by identity) will have once `node` is keyed `key`. */
-function relKey(key: string, node: EditorBlock | BlockContent, target: EditorBlock, ctx: CommandContext): string {
-    if ((node as EditorBlock) === target) return key;
-    const children = (node as { children?: EditorBlock[] }).children ?? [];
-    for (let i = 0; i < children.length; i++) {
-        if (!ctx.schema.isContainer(children[i].type) && children[i] !== target) continue;
-        const found = relKey(`${key}.${i}`, children[i], target, ctx);
-        if (found) return found;
-    }
-    return '';
-}
-
-export const insertThematicBreak: Command = insertBlockAfter({ type: 'thematicBreak' }, { replaceEmpty: true });
-
-export const insertImage = (url: string, alt = '', title?: string): Command => {
-    return (state, dispatch, ctx) => {
-        const attrs: Record<string, string> = { url, alt };
-        if (title) attrs.title = title;
-        return insertAtom('image', attrs)(state, dispatch, ctx);
-    };
-};
-
-export const insertTable =
-    (rows = 2, cols = 2): Command =>
-    (state, dispatch, ctx) => {
-        const cell = (): TableCell => ({ type: 'tableCell', children: [] });
-        const row = (): TableRow => ({ type: 'tableRow', children: Array.from({ length: cols }, cell) });
-        const table: Table = { type: 'table', align: Array.from({ length: cols }, () => null), children: Array.from({ length: rows }, row) };
-        return insertBlockAfter(table)(state, dispatch, ctx);
-    };
-
-function tableContext(state: EditorState, key: string): { table: BlockEntry; row: BlockEntry; cell: BlockEntry } | null {
-    const cell = entryOf(state, key);
-    if (!cell || cell.node.type !== 'tableCell') return null;
-    const row = entryOf(state, cell.parentKey!)!;
-    const table = entryOf(state, row.parentKey!)!;
-    return { table, row, cell };
-}
-
-const tableOp =
-    (fn: (table: Table, row: number, col: number) => Table | null, selectCell?: (row: number, col: number) => [number, number]): Command =>
-    (state, dispatch) => {
-        const sel = state.selection;
-        const key = sel?.mode === 'text' ? sel.anchor.key : null;
-        if (!key) return false;
-        const tc = tableContext(state, key);
-        if (!tc) return false;
-        const next = fn(tc.table.node as Table, tc.row.index, tc.cell.index);
-        if (!next) return false;
-        const [r, c] = selectCell ? selectCell(tc.row.index, tc.cell.index) : [tc.row.index, tc.cell.index];
-        const tableKey = tc.table.node.key!;
-        const cr = Math.min(r, next.children.length - 1);
-        const cc = Math.min(c, next.children[cr].children.length - 1);
-        dispatch?.({ steps: [{ type: 'replaceBlock', key: tableKey, node: next }], selection: textSelection(`${tableKey}.${cr}.${cc}`, 0), meta: meta() });
-        return true;
-    };
-
-const emptyRow = (cols: number): TableRow => ({ type: 'tableRow', children: Array.from({ length: cols }, () => ({ type: 'tableCell', children: [] })) });
-
-export const addRowAfter: Command = tableOp((t, r) => ({ ...t, children: [...t.children.slice(0, r + 1), emptyRow(t.children[0].children.length), ...t.children.slice(r + 1)] }), (r, c) => [r + 1, c]);
-export const addRowBefore: Command = tableOp((t, r) => (r === 0 ? null : { ...t, children: [...t.children.slice(0, r), emptyRow(t.children[0].children.length), ...t.children.slice(r)] }));
-export const deleteRow: Command = tableOp((t, r) => (r === 0 || t.children.length <= 2 ? null : { ...t, children: t.children.filter((_, i) => i !== r) }), (r, c) => [Math.max(1, r - 1), c]);
-export const addColumnAfter: Command = tableOp((t, _r, c) => ({
-    ...t,
-    align: [...(t.align ?? []).slice(0, c + 1), null, ...(t.align ?? []).slice(c + 1)],
-    children: t.children.map((row) => ({ ...row, children: [...row.children.slice(0, c + 1), { type: 'tableCell', children: [] }, ...row.children.slice(c + 1)] })),
-}), (r, c) => [r, c + 1]);
-export const addColumnBefore: Command = tableOp((t, _r, c) => ({
-    ...t,
-    align: [...(t.align ?? []).slice(0, c), null, ...(t.align ?? []).slice(c)],
-    children: t.children.map((row) => ({ ...row, children: [...row.children.slice(0, c), { type: 'tableCell', children: [] }, ...row.children.slice(c)] })),
-}));
-export const deleteColumn: Command = tableOp((t, _r, c) =>
-    t.children[0].children.length <= 1
-        ? null
-        : { ...t, align: (t.align ?? []).filter((_, i) => i !== c), children: t.children.map((row) => ({ ...row, children: row.children.filter((_, i) => i !== c) })) }, (r, c) => [r, Math.max(0, c - 1)]);
-export const setColumnAlign = (align: 'left' | 'center' | 'right' | null): Command =>
-    tableOp((t, _r, c) => {
-        const next = [...(t.align ?? t.children[0].children.map(() => null))];
-        next[c] = align;
-        return { ...t, align: next };
-    });
-
 /** Delete the selected block(s) (block selection) or the current block when it is void/code. */
 export const deleteBlock: Command = (state, dispatch, ctx) => {
     const keys = selectedBlockKeys(state);
@@ -783,15 +460,15 @@ export const deleteBlock: Command = (state, dispatch, ctx) => {
     const entries = keys.map((k) => entryOf(state, k)).filter((e): e is BlockEntry => !!e);
     if (!entries.length) return false;
     const steps: Step[] = [];
-    for (let i = entries.length - 1; i >= 0; i--) steps.push(...removeSteps(state, entries[i]));
-    // Focus: the previous editable block, else the next, else a fresh paragraph.
+    for (let i = entries.length - 1; i >= 0; i--) steps.push(...removeSteps(state, entries[i], ctx));
+    // Focus: the previous editable block, else the next, else a fresh default block.
     const first = entries[0];
     const prevKey = state.index().prevEditable(firstEditable(first.node, ctx)?.key ?? first.node.key!);
     let selection: EditorSelection = null;
     if (prevKey && !keys.some((k) => prevKey.startsWith(k))) selection = textSelection(prevKey, lengthOf(entryOf(state, prevKey)!.node, ctx));
     const rootRemovals = steps.filter((s) => s.type === 'removeBlock' && s.parentKey === null).length;
     if (rootRemovals >= state.doc.children.length) {
-        steps.push({ type: 'insertBlock', parentKey: null, index: 0, node: paragraph() });
+        steps.push({ type: 'insertBlock', parentKey: null, index: 0, node: defaultBlock(ctx) });
         selection = textSelection('b-0', 0);
     }
     dispatch?.({ steps, selection, meta: meta() });
@@ -808,20 +485,18 @@ export const duplicateBlock: Command = (state, dispatch) => {
     return true;
 };
 
-function stripKeys<T>(node: T): T {
-    return JSON.parse(JSON.stringify(node, (k, v) => (k === 'key' || k === 'position' ? undefined : v)));
-}
-
 const moveBy =
     (delta: -1 | 1): Command =>
-    (state, dispatch) => {
+    (state, dispatch, ctx) => {
         const keys = selectedBlockKeys(state);
         if (keys.length !== 1) return false;
         const entry = entryOf(state, keys[0]);
         if (!entry) return false;
-        // Move the top-most block that is a direct child of a container the user sees (not a tableCell/listItem paragraph).
+        // Move the unit the user sees: a block that is its parent's only child moves with the parent when the parent says so (a list item).
         let target = entry;
-        while (target.parent.type === 'listItem' && target.index === 0 && (target.parent as ListItem).children.length === 1) target = entryOf(state, target.parentKey!)!;
+        while (target.parentKey !== null && ctx.schema.get(target.parent.type)?.moveAsUnit && target.index === 0 && (target.parent as { children: unknown[] }).children.length === 1) {
+            target = entryOf(state, target.parentKey)!;
+        }
         const siblings = (target.parent as { children: EditorBlock[] }).children;
         const to = target.index + delta;
         if (to < 0 || to >= siblings.length) return false;
@@ -835,13 +510,13 @@ const moveBy =
 export const moveBlockUp: Command = moveBy(-1);
 export const moveBlockDown: Command = moveBy(1);
 
-/** Leave a code block: insert a paragraph after it and move the caret there. */
+/** Leave a code block: insert a default block after it and move the caret there. */
 export const exitCode: Command = (state, dispatch, ctx) => {
     const sel = textSel(state);
     if (!sel) return false;
     const entry = entryOf(state, sel.anchor.key);
     if (!entry || ctx.schema.role(entry.node.type) !== 'code') return false;
-    return insertBlockAfter(paragraph(), { replaceEmpty: false })(state, dispatch, ctx);
+    return insertBlockAfter(defaultBlock(ctx), { replaceEmpty: false })(state, dispatch, ctx);
 };
 
 // ---------------------------------------------------------------------------
@@ -860,10 +535,9 @@ export const selectBlock =
 export const escapeToBlockSelection: Command = (state, dispatch) => {
     const sel = textSel(state);
     if (!sel) return false;
-    let entry = entryOf(state, sel.anchor.key);
+    const entry = entryOf(state, sel.anchor.key);
     if (!entry) return false;
-    while (entry.parentKey !== null) entry = entryOf(state, entry.parentKey)!;
-    dispatch?.({ steps: [], selection: blockSelection(entry.node.key!), meta: meta() });
+    dispatch?.({ steps: [], selection: blockSelection(topLevelOf(state, entry).node.key!), meta: meta() });
     return true;
 };
 
@@ -887,10 +561,9 @@ export const extendBlockSelection =
         let anchorKey: string;
         let headKey: string;
         if (sel.mode === 'text') {
-            let entry = entryOf(state, sel.anchor.key);
+            const entry = entryOf(state, sel.anchor.key);
             if (!entry) return false;
-            while (entry.parentKey !== null) entry = entryOf(state, entry.parentKey)!;
-            anchorKey = headKey = entry.node.key!;
+            anchorKey = headKey = topLevelOf(state, entry).node.key!;
         } else {
             anchorKey = sel.anchorKey;
             headKey = sel.headKey;
@@ -971,12 +644,6 @@ export const focusNeighbour =
         return true;
     };
 
-function topLevelOf(state: EditorState, entry: BlockEntry): BlockEntry {
-    let cur = entry;
-    while (cur.parentKey !== null) cur = entryOf(state, cur.parentKey)!;
-    return cur;
-}
-
 function voidBetween(state: EditorState, fromKey: string, toKey: string, dir: 'up' | 'down', ctx: CommandContext): string | null {
     const a = topLevelOf(state, entryOf(state, fromKey)!);
     const b = topLevelOf(state, entryOf(state, toKey)!);
@@ -1020,21 +687,23 @@ export const setDocument =
         return true;
     };
 
-export const setMarkdown =
-    (markdown: string, opts: { origin?: TransactionMeta['origin']; addToHistory?: boolean } = {}): Command =>
+/** Replace the document with `source` parsed by a format (`formatId`, else the primary one). */
+export const setSource =
+    (source: string, formatId?: string, opts: { origin?: TransactionMeta['origin']; addToHistory?: boolean } = {}): Command =>
     (state, dispatch, ctx) => {
-        if (!ctx.parse) return false;
-        return setDocument(ctx.parse(markdown), opts)(state, dispatch, ctx);
+        const format = formatId ? ctx.formats.find((f) => f.id === formatId) : ctx.formats[0];
+        if (!format) return false;
+        return setDocument(format.parse(source, { plugins: ctx.plugins }), opts)(state, dispatch, ctx);
     };
 
 export const clear: Command = (state, dispatch, ctx) =>
-    setDocument({ type: 'root', children: [paragraph()] }, { origin: 'command', addToHistory: true })(state, dispatch, ctx);
+    setDocument({ type: 'root', children: [defaultBlock(ctx)] }, { origin: 'command', addToHistory: true })(state, dispatch, ctx);
 
 // ---------------------------------------------------------------------------
 // Paste
 // ---------------------------------------------------------------------------
 
-/** Insert parsed blocks at the selection: the first block merges into the current paragraph when both are inline. */
+/** Insert parsed blocks at the selection: the first block merges into the current text block when both are text. */
 export const insertBlocks =
     (blocks: BlockContent[]): Command =>
     (state, dispatch, ctx) => {
@@ -1046,37 +715,38 @@ export const insertBlocks =
         const { from, to } = selectionRange(sel);
         const steps: Step[] = [];
         let selection: EditorSelection = sel;
+        const defaultType = ctx.schema.defaultBlock;
         if (ctx.schema.role(entry.node.type) === 'textblock' && blocks.length === 1 && ctx.schema.role(blocks[0].type) === 'textblock') {
             const slice = toFlat((blocks[0] as { children: PhrasingContent[] }).children, ctx.schema);
             steps.push({ type: 'replaceInline', key, from, to, slice });
             selection = textSelection(key, from + slice.text.length);
         } else if (ctx.schema.role(entry.node.type) === 'textblock') {
-            // Split the current block around the selection; a pasted paragraph at either
+            // Split the current block around the selection; a pasted default block at either
             // edge merges into that half (a heading, list or code block stays its own block).
             const flat = inlineFlat(state, key, ctx)!;
             const head = sliceFlat(flat, 0, from);
             const tail = sliceFlat(flat, to, flat.text.length);
             const list = blocks.slice();
             let headFlat = head;
-            if (list[0].type === 'paragraph') headFlat = concatFlat(head, toFlat((list.shift() as { children: PhrasingContent[] }).children, ctx.schema));
+            if (list[0].type === defaultType) headFlat = concatFlat(head, toFlat((list.shift() as { children: PhrasingContent[] }).children, ctx.schema));
             let tailFlat = tail;
             let lastKey: string | null = null;
             let lastOffset = 0;
-            if (list.length && list[list.length - 1].type === 'paragraph') {
+            if (list.length && list[list.length - 1].type === defaultType) {
                 const lastFlat = toFlat((list.pop() as { children: PhrasingContent[] }).children, ctx.schema);
                 lastOffset = lastFlat.text.length;
                 tailFlat = concatFlat(lastFlat, tail);
             }
             let at = entry.index + 1;
-            if (headFlat.text.length === 0 && list.length && entry.node.type === 'paragraph') {
-                // Nothing before the caret: the first pasted block takes the paragraph's place.
+            if (headFlat.text.length === 0 && list.length && entry.node.type === defaultType) {
+                // Nothing before the caret: the first pasted block takes the block's place.
                 steps.push({ type: 'replaceBlock', key, node: list.shift()! });
             } else {
                 steps.push({ type: 'setInline', key, flat: headFlat });
             }
             for (const b of list) steps.push({ type: 'insertBlock', parentKey: entry.parentKey, index: at++, node: b });
             if (tailFlat.text.length || list.length === 0 || lastOffset) {
-                steps.push({ type: 'insertBlock', parentKey: entry.parentKey, index: at, node: paragraph(toInline(tailFlat, ctx.schema)) });
+                steps.push({ type: 'insertBlock', parentKey: entry.parentKey, index: at, node: defaultBlock(ctx, toInline(tailFlat, ctx.schema)) });
                 lastKey = keyAt(entry.parentKey, at);
                 selection = textSelection(lastKey, lastOffset);
             } else {
@@ -1094,66 +764,20 @@ export const insertBlocks =
         return true;
     };
 
-/** Paste text: markdown with block structure becomes blocks, a single line becomes inline content. */
-export const pasteText =
-    (text: string): Command =>
+/**
+ * Paste: the first format (in order) that reads a flavour present in `data`
+ * parses it — a markdown editor takes `text/markdown` over `text/plain`,
+ * and claims plain text as markdown; a format that does not list
+ * `text/plain` leaves plain text to `plainTextFormat`. Block structure
+ * becomes blocks, a single line becomes inline content.
+ */
+export const paste =
+    (data: PasteData): Command =>
     (state, dispatch, ctx) => {
-        if (!ctx.parse) return insertText(text, { group: undefined, origin: 'paste' })(state, dispatch, ctx);
-        const root = ctx.parse(text);
+        const picked = pickPasteFormat(data, ctx.formats) ?? (data.text ? { format: plainTextFormat, source: data.text } : null);
+        if (!picked) return false;
+        const root = picked.format.parse(picked.source, { plugins: ctx.plugins });
         const blocks = root.children.map((b) => stripKeys(b));
         if (!blocks.length) return false;
         return insertBlocks(blocks)(state, dispatch, ctx);
     };
-
-/** All commands by name, for keymaps and plugins. */
-export const commands = {
-    insertHardBreak,
-    splitBlock,
-    joinBackward,
-    joinForward,
-    indentListItem,
-    outdentListItem,
-    toggleStrong: toggleMark('strong'),
-    toggleEmphasis: toggleMark('emphasis'),
-    toggleDelete: toggleMark('delete'),
-    toggleInlineCode: toggleMark('inlineCode'),
-    unsetLink,
-    setParagraph: setBlockType('paragraph'),
-    setHeading1: setBlockType('heading', { depth: 1 }),
-    setHeading2: setBlockType('heading', { depth: 2 }),
-    setHeading3: setBlockType('heading', { depth: 3 }),
-    setHeading4: setBlockType('heading', { depth: 4 }),
-    setHeading5: setBlockType('heading', { depth: 5 }),
-    setHeading6: setBlockType('heading', { depth: 6 }),
-    setCodeBlock: setBlockType('code'),
-    toggleBulletList: toggleList('bullet'),
-    toggleOrderedList: toggleList('ordered'),
-    toggleTaskList: toggleList('task'),
-    toggleTaskChecked: toggleTaskChecked(),
-    wrapInBlockquote,
-    liftOutOfBlockquote,
-    insertThematicBreak,
-    addRowAfter,
-    addRowBefore,
-    deleteRow,
-    addColumnAfter,
-    addColumnBefore,
-    deleteColumn,
-    deleteBlock,
-    duplicateBlock,
-    moveBlockUp,
-    moveBlockDown,
-    exitCode,
-    escapeToBlockSelection,
-    escapeToText,
-    extendBlockSelectionUp: extendBlockSelection('up'),
-    extendBlockSelectionDown: extendBlockSelection('down'),
-    selectAll,
-    focusUp: focusNeighbour('up'),
-    focusDown: focusNeighbour('down'),
-    focusStart,
-    focusEnd,
-    clear,
-} satisfies Record<string, Command>;
-
-export type CommandName = keyof typeof commands;

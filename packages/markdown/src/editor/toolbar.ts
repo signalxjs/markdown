@@ -7,8 +7,10 @@
  */
 
 import type { List, ListItem } from '../ast/index.js';
-import type { Command, CommandContext, Dispatch, ListKind } from './commands.js';
-import { commands, insertTable, setBlockType, setLink, toggleList } from './commands.js';
+import type { Command, CommandContext, Dispatch } from './commands.js';
+import { setBlockType } from './commands.js';
+import { insertTable, listKindOf, setLink, toggleList, type ListKind } from './commands-standard.js';
+import { commands } from './registry.js';
 import { marksAt } from './inline-flat.js';
 import type { BlockEntry, EditorState } from './state.js';
 import { selectionRange } from './state.js';
@@ -21,6 +23,8 @@ export interface ToolbarState {
     blockType: string | null;
     /** The block's own attributes (`depth`, `lang`, …). */
     attrs: Record<string, unknown>;
+    /** Types of the block's ancestors, nearest first (`listItem`, `list`, `blockquote`, …). */
+    ancestors: readonly string[];
     /** Kind of the enclosing list, when the block is in one. */
     listKind: ListKind | null;
     inBlockquote: boolean;
@@ -62,9 +66,14 @@ function ownAttrs(node: object): Record<string, unknown> {
     return out;
 }
 
-function listKindOf(list: List, item: ListItem): ListKind {
-    if (item.checked !== undefined && item.checked !== null) return 'task';
-    return list.ordered ? 'ordered' : 'bullet';
+function ancestorTypes(state: EditorState, entry: BlockEntry): string[] {
+    const out: string[] = [];
+    let cur: BlockEntry | undefined = entry.parentKey === null ? undefined : state.index().get(entry.parentKey);
+    while (cur) {
+        out.push(cur.node.type);
+        cur = cur.parentKey === null ? undefined : state.index().get(cur.parentKey);
+    }
+    return out;
 }
 
 /** The list kind and blockquote-ness of a block, from its ancestors (and itself when it is a list). */
@@ -84,7 +93,7 @@ function containerInfo(state: EditorState, entry: BlockEntry): { listKind: ListK
     return { listKind, inBlockquote };
 }
 
-const NONE: Omit<ToolbarState, 'canUndo' | 'canRedo'> = { activeMarks: [], blockType: null, attrs: {}, listKind: null, inBlockquote: false, mode: 'none' };
+const NONE: Omit<ToolbarState, 'canUndo' | 'canRedo'> = { activeMarks: [], blockType: null, attrs: {}, ancestors: [], listKind: null, inBlockquote: false, mode: 'none' };
 
 /** The marks at the caret / covering a text selection (empty for block selections and code). */
 function activeMarksOf(state: EditorState, ctx: CommandContext): string[] {
@@ -108,6 +117,7 @@ export function toolbarState(state: EditorState, ctx: CommandContext, history: {
         activeMarks: activeMarksOf(state, ctx),
         blockType: entry.node.type,
         attrs: ownAttrs(entry.node),
+        ancestors: ancestorTypes(state, entry),
         ...containerInfo(state, entry),
         mode: sel.mode,
         ...base,

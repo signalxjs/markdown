@@ -8,6 +8,7 @@
 
 import type { InlineFlat } from '../editor/inline-flat.js';
 import { flatEquals, spliceFlat } from '../editor/inline-flat.js';
+import type { PasteData } from '../editor/paste.js';
 import type {
     BoundaryKey,
     CaretRect,
@@ -37,8 +38,8 @@ export interface FakeInlineSurface extends InlineSurface {
     press(key: BoundaryKey, goalX?: number): boolean;
     /** Simulate an IME session: start, provisional updates (whole-content), end with the committed text. */
     compose(updates: string[], committed: string): void;
-    /** Simulate a paste. */
-    paste(text: string, markdown?: string): boolean;
+    /** Simulate a paste: a string is `text/plain`, an object carries every flavour. */
+    paste(data: string | PasteData): boolean;
     /** Place the caret / selection (raising `selection`). */
     select(start: number, end?: number): void;
     /** Clear the recorded calls. */
@@ -145,8 +146,8 @@ export function createFakeInlineSurface(init: InlineSurfaceInit): FakeInlineSurf
             composing = false;
             init.events.compositionEnd(flat);
         },
-        paste(text, markdown) {
-            return init.events.paste({ text, markdown, range: sel() });
+        paste(data) {
+            return init.events.paste({ data: typeof data === 'string' ? { text: data } : data, range: sel() });
         },
         select(start, end = start) {
             selection = { start, end };

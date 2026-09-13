@@ -8,7 +8,7 @@ import { standardNodes } from '../../src/schema/index.js';
 import { textSelection } from '../../src/editor/state.js';
 import type { TriggerItem, TriggerSelectApi } from '../../src/editor/trigger/index.js';
 import type { Command } from '../../src/editor/commands.js';
-import { commands } from '../../src/editor/commands.js';
+import { commands } from '../../src/editor/registry.js';
 
 const md = (e: ReturnType<typeof createEditor>) => toMarkdown(e.state.doc);
 

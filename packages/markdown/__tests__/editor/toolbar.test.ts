@@ -7,11 +7,12 @@ import type { EditorSelection, EditorState } from '../../src/editor/state.js';
 import type { BlockContent, Root } from '../../src/ast/index.js';
 import { applyTransaction } from '../../src/editor/transaction.js';
 import type { Command, CommandContext } from '../../src/editor/commands.js';
+import { markdownFormat } from '../../src/markdown/index.js';
 import { defaultToolbarItems, toolbarState } from '../../src/editor/toolbar.js';
 import type { ToolbarContext, ToolbarItem, ToolbarState } from '../../src/editor/toolbar.js';
 
 const schema = markdownSchema;
-const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
+const ctx: CommandContext = { schema, formats: [markdownFormat] };
 const doc = (...children: BlockContent[]): Root => ({ type: 'root', children });
 const p = (text = ''): BlockContent => ({ type: 'paragraph', children: text ? [{ type: 'text', value: text }] : [] });
 const at = (key: string, offset: number, to?: number) => textSelection(key, offset, to);
@@ -60,6 +61,7 @@ describe('toolbarState', () => {
             activeMarks: [],
             blockType: 'paragraph',
             attrs: {},
+            ancestors: [],
             listKind: null,
             inBlockquote: false,
             canUndo: false,
@@ -92,6 +94,7 @@ describe('toolbarState', () => {
             activeMarks: [],
             blockType: null,
             attrs: {},
+            ancestors: [],
             listKind: null,
             inBlockquote: false,
             canUndo: true,
@@ -109,7 +112,7 @@ describe('defaultToolbarItems', () => {
     });
 
     it('derives active states from the toolbar state', () => {
-        const tb = (overrides: Partial<ToolbarState>): ToolbarState => ({ activeMarks: [], blockType: 'paragraph', attrs: {}, listKind: null, inBlockquote: false, canUndo: false, canRedo: false, mode: 'text', ...overrides });
+        const tb = (overrides: Partial<ToolbarState>): ToolbarState => ({ activeMarks: [], blockType: 'paragraph', attrs: {}, ancestors: [], listKind: null, inBlockquote: false, canUndo: false, canRedo: false, mode: 'text', ...overrides });
         expect(by.bold.isActive!(tb({ activeMarks: ['strong'] }))).toBe(true);
         expect(by.bold.isActive!(tb({}))).toBe(false);
         expect(by.italic.isActive!(tb({ activeMarks: ['emphasis'] }))).toBe(true);

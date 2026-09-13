@@ -23,7 +23,7 @@ export interface FormatSerializeOptions {
 export interface DocumentFormat<O = {}> {
     /** The format's id — the key of its slot in `RichTextPlugin.formats` (`'markdown'`, `'html'`, `'text'`). */
     readonly id: string;
-    /** Clipboard / transfer MIME types this format reads and writes, most specific first. */
+    /** Clipboard / transfer MIME types this format reads, most specific first (the first is what it writes). A format that lists `text/plain` claims plain-text pastes. */
     readonly mime: readonly string[];
     /** Node specs the format needs beyond the standard vocabulary (markdown's `html`, `definition`, references). */
     readonly nodes?: readonly NodeSpec[];

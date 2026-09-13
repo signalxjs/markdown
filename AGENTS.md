@@ -198,7 +198,7 @@ Source layout (`packages/markdown/src`):
   engine, `toJSON` / `fromJSON`), `parser/`, `serializer/`, `markdown/`
   (`markdownFormat`),
   `render/`, `stream/`, `plugins/` (the reference plugins, e.g. mention),
-  `dom/`, `shiki/`, `editor/` (with `editor/dom/`), `testing/`. Cross-folder
+  `dom/`, `shiki/`, `editor/` (with `editor/dom/`, and `editor/markdown/` — the markdown editor preset that moves to the markdown package in phase 5), `testing/`. Cross-folder
   imports go through `../<folder>/index.js`; inside a folder, siblings import
   each other directly. A file a folder's `index.ts` does not re-export is
   private to that folder.
