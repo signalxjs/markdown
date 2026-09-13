@@ -68,9 +68,15 @@ importers:
 
   examples/playground:
     dependencies:
-      '@sigx/markdown':
+      '@sigx/richtext':
         specifier: workspace:*
-        version: link:../../packages/markdown
+        version: link:../../packages/richtext
+      '@sigx/richtext-markdown':
+        specifier: workspace:*
+        version: link:../../packages/richtext-markdown
+      '@sigx/richtext-shiki':
+        specifier: workspace:*
+        version: link:../../packages/richtext-shiki
       shiki:
         specifier: ^4.0.2
         version: 4.4.3
@@ -91,7 +97,7 @@ importers:
         specifier: ^8.0.3
         version: 8.3.0(@types/node@25.9.6)(jiti@2.7.0)
 
-  packages/markdown:
+  packages/richtext:
     devDependencies:
       '@sigx/reactivity':
         specifier: 'catalog:'
@@ -103,6 +109,66 @@ importers:
         specifier: 'catalog:'
         version: 0.15.6
       '@sigx/server-renderer':
+        specifier: 'catalog:'
+        version: 0.15.6
+      '@sigx/vite':
+        specifier: 'catalog:'
+        version: 0.15.6(@sigx/server-renderer@0.15.6)(sigx@0.15.6)(vite@8.3.0(@types/node@25.9.6)(jiti@2.7.0))
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.6
+      sigx:
+        specifier: 'catalog:'
+        version: 0.15.6
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.3
+        version: 8.3.0(@types/node@25.9.6)(jiti@2.7.0)
+
+  packages/richtext-markdown:
+    devDependencies:
+      '@sigx/reactivity':
+        specifier: 'catalog:'
+        version: 0.15.6
+      '@sigx/richtext':
+        specifier: workspace:*
+        version: link:../richtext
+      '@sigx/runtime-core':
+        specifier: 'catalog:'
+        version: 0.15.6
+      '@sigx/vite':
+        specifier: 'catalog:'
+        version: 0.15.6(@sigx/server-renderer@0.15.6)(sigx@0.15.6)(vite@8.3.0(@types/node@25.9.6)(jiti@2.7.0))
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.6
+      sigx:
+        specifier: 'catalog:'
+        version: 0.15.6
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.3
+        version: 8.3.0(@types/node@25.9.6)(jiti@2.7.0)
+
+  packages/richtext-shiki:
+    devDependencies:
+      '@sigx/reactivity':
+        specifier: 'catalog:'
+        version: 0.15.6
+      '@sigx/richtext':
+        specifier: workspace:*
+        version: link:../richtext
+      '@sigx/richtext-markdown':
+        specifier: workspace:*
+        version: link:../richtext-markdown
+      '@sigx/runtime-core':
+        specifier: 'catalog:'
+        version: 0.15.6
+      '@sigx/runtime-dom':
         specifier: 'catalog:'
         version: 0.15.6
       '@sigx/vite':

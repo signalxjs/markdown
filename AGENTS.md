@@ -1,4 +1,4 @@
-# SignalX markdown — shared agent guide
+# SignalX richtext — shared agent guide
 
 > ⚠️ **BRANCH FIRST — never work on `main`.** Before touching ANY file, create a
 > worktree (`pnpm wt new <N-short-slug>`) and do everything from
@@ -21,24 +21,28 @@ This is the sigx standard agent setup. The same pattern (this file +
 it originates in [`signalxjs/repo-template`](https://github.com/signalxjs/repo-template).
 See "Adopting this setup in another sigx repo" at the bottom.
 
-SignalX Markdown (`signalxjs/markdown`) is the home of `@sigx/markdown` — markdown
-for SignalX: an mdast-compatible AST, an incremental parser that keeps
-finalized blocks stable while a source string grows (built for token-by-token
-AI output), a serializer and a save-friendly JSON document,
-`createMarkdownStream()`, a renderer-neutral render engine with a DOM view
-(`./dom`) and optional Shiki highlighting (`./shiki`), and a block-tree editor
-core (`./editor`) with a DOM editor (`./editor/dom`). One plugin contract feeds
-the parser, the serializer, every renderer and the editor. Consumed by
+SignalX Richtext (`signalxjs/richtext`) is the home of `@sigx/richtext` — rich
+text for SignalX: a schema-driven, mdast-shaped document model where a
+`DocumentFormat` is a codec into and out of one tree, a generic incremental
+engine that keeps finalized blocks stable while a source string grows (built
+for token-by-token AI output), a save-friendly JSON document,
+`createTextStream()`, a renderer-neutral render engine with a DOM view
+(`./dom`), and a block-tree editor core (`./editor`) with a DOM editor
+(`./editor/dom`) — plus the formats and plugins on top of it:
+`@sigx/richtext-markdown` (the CommonMark + GFM parser and serializer,
+`markdownFormat`, the markdown editor preset), `@sigx/richtext-shiki` (Shiki
+highlighting as a plugin) and, next, `@sigx/richtext-html`. One plugin
+contract feeds every format, every renderer and the editor. Consumed by
 `@sigx/lynx-markdown` (native rendering and editing on Lynx), `@sigx/ai` chat
 UI on the web and, later, a terminal renderer. A pnpm workspace (ESM,
-`"type": "module"`) with the published package under `packages/markdown` and
-demos under `examples/`. Tech stack: TypeScript (strict), Vite, Vitest
-(happy-dom), oxlint. Published to npm under the `@sigx` scope.
+`"type": "module"`) with the published packages under `packages/` and demos
+under `examples/`. Tech stack: TypeScript (strict), Vite, Vitest (happy-dom),
+oxlint. Published to npm under the `@sigx` scope.
 
 ## Development workflow (issue → PR → Copilot review → merge)
 
 **This is mandatory for EVERY agent-driven change — including one-line fixes.
-Never commit straight to `main`.** Repo: `signalxjs/markdown`, base branch `main`.
+Never commit straight to `main`.** Repo: `signalxjs/richtext`, base branch `main`.
 (Human contributors follow `CONTRIBUTING.md`, where an issue is optional; for
 agents the issue-first flow below is required.)
 
@@ -76,7 +80,7 @@ agents the issue-first flow below is required.)
    `gh` is too old to resolve `@copilot` (error: `'@copilot' not found`), request it
    via the API instead — don't skip it:
    ```sh
-   gh api --method POST repos/signalxjs/markdown/pulls/<pr>/requested_reviewers \
+   gh api --method POST repos/signalxjs/richtext/pulls/<pr>/requested_reviewers \
      -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
    ```
    (The reviewer-request API takes the `[bot]`-suffixed slug; the review author
@@ -94,7 +98,7 @@ agents the issue-first flow below is required.)
 
    **Then resolve the threads.** Where the repo's ruleset sets
    `required_review_thread_resolution` (check with
-   `gh api repos/signalxjs/markdown/rules/branches/main`), a PR carrying an
+   `gh api repos/signalxjs/richtext/rules/branches/main`), a PR carrying an
    unresolved **inline** comment cannot merge however green it is — with a
    merge queue it silently never enqueues, and `gh pr checks` shows nothing
    wrong. Pushing the fix does not resolve a thread, and neither does replying
@@ -102,7 +106,7 @@ agents the issue-first flow below is required.)
    resolve it over GraphQL:
    ```sh
    # list the open threads
-   gh api graphql -f query='query { repository(owner:"signalxjs", name:"markdown") {
+   gh api graphql -f query='query { repository(owner:"signalxjs", name:"richtext") {
      pullRequest(number:<pr>) { reviewThreads(first:100) { nodes {
        id isResolved comments(first:1){nodes{body}} } } } } }' \
      -q '.data.repository.pullRequest.reviewThreads.nodes[]
@@ -139,7 +143,7 @@ agents the issue-first flow below is required.)
 
 ```bash
 pnpm install
-pnpm build       # the published package (vite dev + prod dists, then tsc declarations)
+pnpm build       # every package in dependency order (vite dev + prod dists, then tsc declarations)
 pnpm test        # vitest run (unit tests across packages)
 pnpm test <path>                   # single test file/dir (substring match)
 pnpm test -t "name of test"        # single test by name (vitest -t)
@@ -150,11 +154,11 @@ pnpm test -t "name of test"        # single test by name (vitest -t)
 pnpm test:watch
 pnpm test:coverage
 pnpm typecheck   # tsgo (a fast TS compiler) over the packages and tests, config: tsconfig.json
-pnpm lint        # oxlint over the package's src and tests
+pnpm lint        # oxlint over every package's src and tests
 pnpm lint:fix
 pnpm size        # size-limit bundle-size check (.size-limit.json)
 pnpm verify:catalog # every core dep flows through the single-minor catalog
-pnpm verify:pack    # pack the published package and import every entry from a scratch app
+pnpm verify:pack    # pack the published packages and import every entry from a scratch app
 ```
 
 Shipped code is `node:`-free and imports `@sigx/runtime-core` / `@sigx/runtime-dom`
@@ -162,52 +166,74 @@ Shipped code is `node:`-free and imports `@sigx/runtime-core` / `@sigx/runtime-d
 on the web, inside a Lynx app (`@sigx/lynx` re-exports the same runtime) and in
 the terminal. Tests and examples may use `sigx`.
 
-To run an example: `pnpm build` first (it resolves the package from `dist/`
-through the workspace link), then `pnpm --filter <example-name> dev`.
+To run an example: `pnpm build` first (it resolves the packages from `dist/`
+through the workspace links), then `pnpm --filter <example-name> dev`.
 
 ## Packages
 
-- `packages/markdown` → `@sigx/markdown` — the package. Entries: `.` (the
-  mdast-compatible AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`,
-  `toJSON` / `fromJSON`, `createMarkdownStream`, the generic `renderDocument`
-  engine and the `MarkdownPlugin` contract — platform-free, runs everywhere),
-  `./dom` (`RichTextView` on `@sigx/runtime-dom`), `./shiki` (optional
-  highlighting; `shiki` is an optional peer), `./editor` (the block-tree editor
-  core: state, steps, history, commands, keymap, input rules, schema, the
-  `InlineSurface` / `CodeSurface` contracts a platform implements),
-  `./editor/dom` (`RichTextEditor` for the web) and `./testing` (streaming
-  harness, `strip()`, the surface conformance suite). Entries land one PR at a
-  time; an entry exists once it is in `exports`.
+- `packages/richtext` → `@sigx/richtext` — the foundation. Entries: `.` (the
+  mdast-shaped AST, the schema — `NodeSpec` as data, `createSchema`,
+  `standardNodes` — the `DocumentFormat` contract, `createLineEngine` /
+  `createReparseEngine`, `plainTextFormat`, `toJSON` / `fromJSON`,
+  `createTextStream`, the schema-driven `renderDocument` engine, the
+  `RichTextPlugin` contract and `mentionNode` — platform-free, runs
+  everywhere), `./dom` (`RichTextView` on `@sigx/runtime-dom`, the
+  `CodeHighlighter` contract), `./editor` (the block-tree editor core: state,
+  steps, history, commands, keymap, input rules, the `InlineSurface` /
+  `CodeSurface` contracts a platform implements), `./editor/dom`
+  (`RichTextEditor` for the web) and `./testing` (streaming harness,
+  `strip()`, fake surfaces, the surface conformance suite). Peers on the sigx
+  runtime only — never on a third-party library: a contract lives here, its
+  implementation is a `richtext-*` plugin package.
+- `packages/richtext-markdown` → `@sigx/richtext-markdown` — markdown as a
+  format. Entries: `.` (the CommonMark + GFM parser, `createIncrementalEngine`,
+  `toMarkdown`, `markdownFormat`, `markdownNodes` / `markdownSchema`, the
+  `MarkdownPluginSlice` contract plugins fill under `formats.markdown`,
+  `mentionPlugin`), `./editor` (`markdownPreset`) and `./testing` (`toHtml()`,
+  the spec-conformance renderer). Peers on `@sigx/richtext`.
+- `packages/richtext-shiki` → `@sigx/richtext-shiki` — `shikiPlugin()` /
+  `createShikiHighlighter()` behind the core's `CodeHighlighter` contract; the
+  only package that imports `shiki`. Peers on `@sigx/richtext` and `shiki`.
 
-Path aliases: `tsconfig.json` and `vitest.config.ts` map `@sigx/markdown` (and
-its subpaths) to `packages/markdown/src`, so tests and typecheck run against
-source, not dist. A new entry is added to BOTH maps (subpaths before the bare
-name — vitest matches aliases in order), to `exports` in `package.json` and
-`entry` in `vite.config.ts`, to `.size-limit.json`, and to `ENTRIES` in
-`scripts/verify-pack.js`. A new package is also added to the root
-`build`/`lint` scripts and to `PACKAGES` in `scripts/publish.js` and
-`scripts/verify-pack.js`.
+Entries land one PR at a time; an entry exists once it is in `exports`.
+Formats never import each other, and the core never imports a format.
 
-Source layout (`packages/markdown/src`):
+Path aliases: `tsconfig.json` and `vitest.config.ts` map every package (and
+its subpaths) to `packages/<name>/src`, so tests and typecheck run against
+source, not dist — a core test may import `@sigx/richtext-markdown` to build
+fixtures through the alias. A new entry is added to BOTH maps (subpaths before
+the bare name — vitest matches aliases in order), to `exports` in
+`package.json` and `entry` in `vite.config.ts`, to `.size-limit.json`, and to
+`ENTRIES` in `scripts/verify-pack.js`. A new package is also added to
+`PACKAGES` in `scripts/publish.js` (dependency order) and
+`scripts/verify-pack.js`, to the playground's dependencies and `paths`, and
+to the issue-template dropdowns; the root `build` / `lint` scripts glob
+`packages/*`.
+
+Source layout (`packages/richtext/src`):
 
 - **One folder per concern; its `index.ts` is the folder's public surface.**
   `utils/`, `ast/` (the node types), `schema/` (`NodeSpec` / `Schema` — the
-  one table that says what every node type is; `standardNodes`,
-  `markdownNodes`), `plugin/` (the contract; `plugin/markdown.ts` is the
-  markdown syntax slot), `document/` (`DocumentFormat`, the incremental
-  engine, `toJSON` / `fromJSON`), `parser/`, `serializer/`, `markdown/`
-  (`markdownFormat`),
-  `render/`, `stream/`, `plugins/` (the reference plugins, e.g. mention),
-  `dom/`, `shiki/`, `editor/` (with `editor/dom/`, and `editor/markdown/` — the markdown editor preset that moves to the markdown package in phase 5), `testing/`. Cross-folder
-  imports go through `../<folder>/index.js`; inside a folder, siblings import
-  each other directly. A file a folder's `index.ts` does not re-export is
-  private to that folder.
+  one table that says what every node type is; `standardNodes`), `plugin/`
+  (the contract), `document/` (`DocumentFormat`, the incremental engines,
+  `plainTextFormat`, `toJSON` / `fromJSON`), `render/`, `stream/`, `plugins/`
+  (the reference plugin nodes, e.g. mention), `dom/`, `editor/` (with
+  `editor/dom/`), `testing/`. Cross-folder imports go through
+  `../<folder>/index.js`; inside a folder, siblings import each other
+  directly. A file a folder's `index.ts` does not re-export is private to
+  that folder.
 - **Imports point one way**:
-  `utils ← ast ← schema ← plugin ← document ← parser ← serializer ← markdown ← render ← plugins`; `stream/`
-  depends on `@sigx/reactivity` only; `dom ← shiki` and `editor ← editor/dom` sit on
+  `utils ← ast ← schema ← plugin ← document ← render ← plugins`; `stream/`
+  depends on `@sigx/reactivity` only; `dom` and `editor ← editor/dom` sit on
   top of the root layers (`editor/dom` may import `dom` — void blocks render
-  through the DOM components — never the reverse); `testing/` is on top of everything and nothing
-  imports from it. No cycles.
+  through the DOM components — never the reverse); `testing/` is on top of
+  everything and nothing imports from it. No cycles.
+- **`packages/richtext-markdown/src`** mirrors the shape: `parser/`,
+  `serializer/`, `plugin/` (the markdown slice contract and its resolver),
+  `format.ts`, `nodes.ts`, `definitions.ts`, `mention.ts`, `editor/` (the
+  preset), `testing/` (`toHtml`). It imports the core through the package
+  entries (`@sigx/richtext`, `@sigx/richtext/editor`) only — never a core
+  file path.
 - **Every entry point is a folder** — `src/index.ts` for `.`,
   `src/<entry>/index.ts` for a subpath — and those files are re-exports
   only, never implementation. `tsc` mirrors the tree, so a subpath's
@@ -262,8 +288,8 @@ the queue, in two moments:
   from the PR:
   ```sh
   gh issue create --repo signalxjs/signalxjs.github.io \
-    --title "markdown: <what changed>" \
-    --body "Source: signalxjs/markdown#<pr>. <What needs documenting, and where on the site.> Not yet released."
+    --title "richtext: <what changed>" \
+    --body "Source: signalxjs/richtext#<pr>. <What needs documenting, and where on the site.> Not yet released."
   ```
   A user-facing PR isn't mergeable until its docs issue exists (see step 6 of
   the workflow).
@@ -271,7 +297,7 @@ the queue, in two moments:
   every open docs issue covering a change shipped in that release:
   ```sh
   gh issue comment <n> --repo signalxjs/signalxjs.github.io \
-    --body "Released in markdown vX.Y.Z."
+    --body "Released in richtext vX.Y.Z."
   ```
   (Mention the published package version(s) too if they differ from the tag.)
   A docs issue without a release comment means *merged but not released — don't
@@ -298,7 +324,7 @@ To adopt it in another repo:
 2. Copy `scripts/worktree.mjs` and `CLAUDE.md` verbatim; copy this `AGENTS.md` as a template.
 3. Add `"wt": "node scripts/worktree.mjs"` to the repo's `package.json` scripts.
 4. Adapt the repo-specific sections of `AGENTS.md`: the intro (what the repo is),
-   "Build, Test, Lint", and "Packages". Replace every `markdown` with the repo name.
+   "Build, Test, Lint", and "Packages". Replace every `richtext` with the repo name.
 5. Keep the workflow, worktree, and conventions sections as-is — they are the
    shared standard.
-6. Lock down `main`: `node scripts/apply-branch-protection.mjs signalxjs/markdown`.
+6. Lock down `main`: `node scripts/apply-branch-protection.mjs signalxjs/richtext`.

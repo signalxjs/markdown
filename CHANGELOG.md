@@ -8,6 +8,24 @@ workspace shares one version line.
 
 ### Changed
 
+- **Package split and repo rename** (#30, phase 5 of #19). `@sigx/markdown`
+  becomes three packages — `@sigx/richtext` (the foundation: `.`, `./dom`,
+  `./editor`, `./editor/dom`, `./testing`), `@sigx/richtext-markdown`
+  (`markdownFormat`, the parser and serializer, `markdownNodes` /
+  `markdownSchema`, `collectDefinitions`, the `MarkdownPluginSlice` contract,
+  `mentionPlugin` / `mentionMarkdown`; `./editor` with `markdownPreset`;
+  `./testing` with `toHtml()`) and `@sigx/richtext-shiki` (`shikiPlugin`,
+  `createShikiHighlighter`; the `./shiki` entry is gone and `shiki` is no
+  longer a peer of the core) — and the repo becomes `signalxjs/richtext`.
+  `@sigx/markdown` is deprecated on npm, not unpublished. Module
+  augmentations (`PhrasingContentMap`, `PluginComponents`, `PluginFormats`)
+  target `@sigx/richtext`. The core's root entry also exports the text
+  helpers (`decodeEntities`, `normalizeLabel`, the character classes) formats
+  build on. `createMentionPlugin` / `createDomMentionPlugin` take
+  `formats` (`{ markdown: mentionMarkdown }`) instead of bundling the
+  markdown syntax; `mentionNode` and the `Mention` type stay in the core.
+  Dev warnings are prefixed `[@sigx/richtext]` / `[@sigx/richtext-markdown]`.
+
 - **Format-agnostic DOM editor** (#28, phase 4b of #19). `<RichTextEditor>`
   replaces `<MarkdownEditor>`: `format` (required) is the codec the
   `source` model, `defaultSource` and the controller (`getSource(formatId?)`,

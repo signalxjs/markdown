@@ -1,5 +1,5 @@
 /*
- * Reference stylesheet for @sigx/markdown's DOM view.
+ * Reference stylesheet for @sigx/richtext's DOM view.
  *
  * The package ships no CSS: every element the default components render
  * carries `data-scope="richtext"` and `data-part="<name>"` (and, with

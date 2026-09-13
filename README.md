@@ -1,13 +1,13 @@
 <div align="center">
 
-# SignalX Markdown
+# SignalX Richtext
 
-**Markdown for [SignalX](https://sigx.dev/) — one incremental parser for web, Lynx and terminal, a save-friendly mdast document, and a block-tree editor.**
+**Rich text for [SignalX](https://sigx.dev/) — one schema-driven document model with pluggable formats, an incremental engine for web, Lynx and terminal, a save-friendly mdast document, and a block-tree editor.**
 
-[![npm](https://img.shields.io/npm/v/@sigx/markdown.svg?label=@sigx/markdown&color=blue)](https://www.npmjs.com/package/@sigx/markdown)
-[![license](https://img.shields.io/npm/l/@sigx/markdown.svg)](./LICENSE)
-[![ci](https://github.com/signalxjs/markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/signalxjs/markdown/actions/workflows/ci.yml)
-[![types](https://img.shields.io/npm/types/@sigx/markdown.svg)](https://www.typescriptlang.org/)
+[![npm](https://img.shields.io/npm/v/@sigx/richtext.svg?label=@sigx/richtext&color=blue)](https://www.npmjs.com/package/@sigx/richtext)
+[![license](https://img.shields.io/npm/l/@sigx/richtext.svg)](./LICENSE)
+[![ci](https://github.com/signalxjs/richtext/actions/workflows/ci.yml/badge.svg)](https://github.com/signalxjs/richtext/actions/workflows/ci.yml)
+[![types](https://img.shields.io/npm/types/@sigx/richtext.svg)](https://www.typescriptlang.org/)
 
 </div>
 
@@ -15,18 +15,19 @@
 
 ## 📚 Documentation
 
-Full guides, API reference and live examples → **<https://sigx.dev/markdown/>**
+Full guides, API reference and live examples → **<https://sigx.dev/richtext/>**
 
 ## Packages
 
-| Entry | What |
+| Package / entry | What |
 |---|---|
-| [`@sigx/markdown`](./packages/markdown) | An mdast-compatible AST, `parseMarkdown`, an incremental engine that keeps finalized blocks stable while a source string grows (built for token-by-token AI output), `toMarkdown`, `toJSON` / `fromJSON`, `createTextStream`, and a renderer-neutral render engine with a plugin contract shared by parser, serializer, renderers and editor |
-| `@sigx/markdown/testing` | `strip()`, `toHtml()`, `feed()` — helpers for tests that parse, stream or render |
-| `@sigx/markdown/dom` | `RichTextView` for the web — default components styled through `data-scope` / `data-part` attributes, a `CodeBlock` chrome with copy button, the `CodeHighlighter` contract |
-| `@sigx/markdown/shiki` | Shiki highlighting as a plugin: `shikiPlugin()` / `createShikiHighlighter()` (`shiki` is an optional peer) |
-| `@sigx/markdown/editor` | The block-tree editor core: state, commands, history, keymap, input rules, triggers and the surface contract a platform implements |
-| `@sigx/markdown/editor/dom` | `RichTextEditor` for the web — a Notion-class block editor: contenteditable surfaces per block, toolbar, block handles and menu, slash commands, mentions, two-way `source` / `document` models |
+| [`@sigx/richtext`](./packages/richtext) | The foundation: an mdast-shaped AST, the schema (`NodeSpec` as data — the one table that says what every node type is), the `DocumentFormat` contract with a generic incremental engine that keeps finalized blocks stable while text streams in, `toJSON` / `fromJSON`, `createTextStream`, a renderer-neutral render engine and the `RichTextPlugin` contract shared by every format, renderer and the editor |
+| `@sigx/richtext/testing` | `strip()`, `feed()`, fake surfaces and the surface conformance suite |
+| `@sigx/richtext/dom` | `RichTextView` for the web — default components styled through `data-scope` / `data-part` attributes, a `CodeBlock` chrome with copy button, the `CodeHighlighter` contract |
+| `@sigx/richtext/editor` | The block-tree editor core: state, commands, history, keymap, input rules, triggers and the surface contract a platform implements |
+| `@sigx/richtext/editor/dom` | `RichTextEditor` for the web — a Notion-class block editor: contenteditable surfaces per block, toolbar, block handles and menu, slash commands, mentions, two-way `source` / `document` models |
+| [`@sigx/richtext-markdown`](./packages/richtext-markdown) | Markdown as a format: the CommonMark + GFM parser, `markdownFormat`, `toMarkdown`, the markdown syntax-extension contract for plugins, `markdownPreset` (`./editor`) and the spec-conformance `toHtml()` (`./testing`) |
+| [`@sigx/richtext-shiki`](./packages/richtext-shiki) | Shiki highlighting as a plugin: `shikiPlugin()` / `createShikiHighlighter()` (the only package that imports `shiki`) |
 
 Examples: [`examples/playground`](./examples/playground) — the view, streaming, plugins, Shiki, the serializer and the editor side by side, with a Playwright suite.
 
@@ -35,7 +36,7 @@ Consumers: [`@sigx/lynx-markdown`](https://sigx.dev/lynx/modules/markdown/overvi
 ## Install
 
 ```bash
-npm install @sigx/markdown
+npm install @sigx/richtext @sigx/richtext-markdown
 ```
 
 Peers on `@sigx/reactivity` and `@sigx/runtime-core` (and `@sigx/runtime-dom` for the web entries) at the same minor as your app's `sigx`.
@@ -44,9 +45,9 @@ Peers on `@sigx/reactivity` and `@sigx/runtime-core` (and `@sigx/runtime-dom` fo
 
 ```tsx
 import { component } from 'sigx';
-import { createTextStream } from '@sigx/markdown';
-import { markdownFormat } from '@sigx/markdown';
-import { RichTextView } from '@sigx/markdown/dom';
+import { createTextStream } from '@sigx/richtext';
+import { RichTextView } from '@sigx/richtext/dom';
+import { markdownFormat } from '@sigx/richtext-markdown';
 
 const stream = createTextStream({ flushIntervalMs: 16 });
 for await (const token of tokens) stream.append(token);

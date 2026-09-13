@@ -1,5 +1,5 @@
 /*
- * Reference stylesheet for @sigx/markdown's DOM editor.
+ * Reference stylesheet for @sigx/richtext's DOM editor.
  *
  * Like the view, the editor ships no CSS. Its elements carry
  * `data-scope="richtext-editor"` (blocks, surfaces, handles),

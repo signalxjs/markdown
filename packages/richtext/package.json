@@ -1,0 +1,97 @@
+{
+    "name": "@sigx/richtext",
+    "version": "0.2.0",
+    "description": "Rich text for SignalX — a schema-driven, mdast-shaped document model with pluggable formats, a renderer-neutral engine with a DOM view, and a block-tree editor for web and Lynx",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "development": "./dist/index.js",
+            "production": "./dist/index.prod.js",
+            "import": "./dist/index.js"
+        },
+        "./dom": {
+            "types": "./dist/dom/index.d.ts",
+            "development": "./dist/dom.js",
+            "production": "./dist/dom.prod.js",
+            "import": "./dist/dom.js"
+        },
+        "./editor": {
+            "types": "./dist/editor/index.d.ts",
+            "development": "./dist/editor.js",
+            "production": "./dist/editor.prod.js",
+            "import": "./dist/editor.js"
+        },
+        "./editor/dom": {
+            "types": "./dist/editor/dom/index.d.ts",
+            "development": "./dist/editor/dom.js",
+            "production": "./dist/editor/dom.prod.js",
+            "import": "./dist/editor/dom.js"
+        },
+        "./testing": {
+            "types": "./dist/testing/index.d.ts",
+            "development": "./dist/testing.js",
+            "production": "./dist/testing.prod.js",
+            "import": "./dist/testing.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "CHANGELOG.md"
+    ],
+    "sideEffects": false,
+    "scripts": {
+        "build": "vite build && vite build --mode prod-dist && tsc --emitDeclarationOnly",
+        "dev": "vite build --watch"
+    },
+    "keywords": [
+        "sigx",
+        "signalx",
+        "richtext",
+        "rich-text",
+        "mdast",
+        "editor",
+        "streaming"
+    ],
+    "author": "Andreas Ekdahl",
+    "license": "MIT",
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/signalxjs/richtext.git",
+        "directory": "packages/richtext"
+    },
+    "homepage": "https://sigx.dev/richtext/",
+    "bugs": {
+        "url": "https://github.com/signalxjs/richtext/issues"
+    },
+    "devDependencies": {
+        "@sigx/reactivity": "catalog:",
+        "@sigx/runtime-core": "catalog:",
+        "@sigx/runtime-dom": "catalog:",
+        "@sigx/server-renderer": "catalog:",
+        "@sigx/vite": "catalog:",
+        "@types/node": "^25.9.1",
+        "sigx": "catalog:",
+        "typescript": "^6.0.3",
+        "vite": "^8.0.3"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "peerDependencies": {
+        "@sigx/reactivity": "^0.15.0",
+        "@sigx/runtime-core": "^0.15.0",
+        "@sigx/runtime-dom": "^0.15.0"
+    },
+    "peerDependenciesMeta": {
+        "@sigx/runtime-dom": {
+            "optional": true
+        }
+    }
+}
