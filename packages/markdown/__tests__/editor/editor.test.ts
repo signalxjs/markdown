@@ -23,6 +23,7 @@ function host(editor: Editor): BridgeHost {
         setSelection: editor.setSelection,
         paste: editor.paste,
         flatOf: editor.flatOf,
+        schema: editor.schema,
         valueOf: editor.valueOf,
         focused: editor.focused,
     };
@@ -31,7 +32,7 @@ function host(editor: Editor): BridgeHost {
 /** Mount a fake surface on block `key`, wired through the bridge, and keep it in sync with the editor like a view would. */
 function mount(editor: Editor, key: string): FakeInlineSurface {
     const bridge = createInlineBridge(key, host(editor));
-    const surface = createFakeInlineSurface({ key, blockType: 'paragraph', attrs: {}, flat: editor.flatOf(key)!, readOnly: false, events: bridge.events });
+    const surface = createFakeInlineSurface({ key, blockType: 'paragraph', schema: editor.schema, attrs: {}, flat: editor.flatOf(key)!, readOnly: false, events: bridge.events });
     editor.listen((tr) => {
         if (!bridge.shouldPush(tr)) return;
         const flat = editor.flatOf(key);
@@ -246,12 +247,12 @@ describe('createEditor', () => {
         expect(md(e)).toBe('```js\nxy\n```\n');
     });
 
-    it('plugin slices contribute commands, keymaps, input rules, inline kinds and transaction hooks', () => {
+    it('plugins contribute node specs, commands, keymaps, input rules and transaction hooks', () => {
         const hook = vi.fn<(tr: Transaction) => Transaction | null>((tr) => tr);
         const plugin: EditorPlugin = {
             ...mentionPlugin,
+            nodes: [{ type: 'mention', role: 'atom', inline: { fromFlat: (s) => ({ type: 'mention', id: s.attrs!.id, label: s.attrs!.label }) as never } }],
             editor: {
-                inline: [{ type: 'mention', kind: 'atom', fromFlat: (s) => ({ type: 'mention', id: s.attrs!.id, label: s.attrs!.label }) as never }],
                 commands: { shout: (state, dispatch) => (dispatch?.({ steps: [{ type: 'replaceInline', key: 'b-0', from: 0, to: 0, slice: { text: '!', spans: [] } }], meta: { origin: 'command' } }), true) },
                 keymap: { 'Mod-Shift-1': 'shout' as never },
                 onTransaction: hook,

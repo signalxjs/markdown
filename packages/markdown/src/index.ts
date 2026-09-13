@@ -9,6 +9,8 @@
  */
 
 export * from './ast/index.js';
+export * from './schema/index.js';
+export * from './document/index.js';
 export * from './plugin/index.js';
 export * from './parser/index.js';
 export * from './serializer/index.js';

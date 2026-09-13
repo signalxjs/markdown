@@ -9,6 +9,7 @@
  * `boundary` event the core answers by running its keymap.
  */
 
+import type { Schema } from '../schema/index.js';
 import type { InlineFlat } from './inline-flat.js';
 
 export interface Range {
@@ -84,6 +85,8 @@ export interface InlineSurfaceEvents {
 export interface InlineSurfaceInit {
     key: string;
     blockType: string;
+    /** The document schema: which span types are marks and which are atoms (the flat model needs it to compare and merge). */
+    schema: Schema;
     attrs: Record<string, unknown>;
     flat: InlineFlat;
     readOnly: boolean;

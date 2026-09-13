@@ -4,8 +4,9 @@
  */
 
 import type { Root } from '../ast/index.js';
+import type { Schema } from '../schema/index.js';
 import type { EditorSelection, EditorState } from './state.js';
-import { makeState } from './state.js';
+import { buildIndex, makeState } from './state.js';
 import type { Step, StepContext } from './steps.js';
 import { applyStep, invertStep } from './steps.js';
 
@@ -48,7 +49,7 @@ export function transaction(steps: Step[], meta: TransactionMeta, extra?: Omit<T
 }
 
 /** Apply a transaction, producing the next state and its inverse steps. Steps are applied in order; the inverse list is reversed. */
-export function applyTransaction(state: EditorState, tr: Transaction, ctx: StepContext = {}, editableTypes?: ReadonlySet<string>): AppliedTransaction {
+export function applyTransaction(state: EditorState, tr: Transaction, ctx: StepContext): AppliedTransaction {
     let doc: Root = state.doc;
     const inverse: Step[] = [];
     for (const step of tr.steps) {
@@ -56,9 +57,9 @@ export function applyTransaction(state: EditorState, tr: Transaction, ctx: StepC
         doc = applyStep(doc, step, ctx);
     }
     inverse.reverse();
-    const selection = tr.selection !== undefined ? tr.selection : mapSelection(state.selection, tr.steps, doc);
+    const selection = tr.selection !== undefined ? tr.selection : mapSelection(state.selection, tr.steps, doc, ctx.schema);
     const composing = tr.composing ?? (tr.meta.composing ?? state.composing);
-    const next = makeState(doc, selection, state.rev + (tr.steps.length || tr.selection !== undefined ? 1 : 0), composing, editableTypes);
+    const next = makeState(doc, selection, state.rev + (tr.steps.length || tr.selection !== undefined ? 1 : 0), composing, ctx.schema);
     return { state: next, inverse };
 }
 
@@ -67,7 +68,7 @@ export function applyTransaction(state: EditorState, tr: Transaction, ctx: StepC
  * selection follows inline edits in its own block; it is dropped when its
  * block disappears; block selections are dropped on structural change.
  */
-export function mapSelection(sel: EditorSelection, steps: Step[], doc: Root): EditorSelection {
+export function mapSelection(sel: EditorSelection, steps: Step[], doc: Root, schema: Schema): EditorSelection {
     if (!sel) return null;
     let cur: EditorSelection = sel;
     for (const step of steps) {
@@ -99,26 +100,18 @@ export function mapSelection(sel: EditorSelection, steps: Step[], doc: Root): Ed
                 case 'moveBlock':
                 case 'replaceDoc':
                     // Structural: keep only if the block still exists (keys may have shifted, so verify).
-                    cur = existsIn(doc, key) ? cur : null;
+                    cur = existsIn(doc, key, schema) ? cur : null;
                     break;
                 default:
                     break;
             }
         } else if (step.type !== 'replaceInline' && step.type !== 'setInline' && step.type !== 'setValue' && step.type !== 'setAttrs') {
-            cur = existsIn(doc, cur.anchorKey) && existsIn(doc, cur.headKey) ? cur : null;
+            cur = existsIn(doc, cur.anchorKey, schema) && existsIn(doc, cur.headKey, schema) ? cur : null;
         }
     }
     return cur;
 }
 
-function existsIn(doc: Root, key: string): boolean {
-    const walk = (children: unknown[]): boolean => {
-        for (const c of children) {
-            const n = c as { key?: string; type: string; children?: unknown[] };
-            if (n.key === key) return true;
-            if (n.children && n.type !== 'paragraph' && n.type !== 'heading' && n.type !== 'tableCell' && walk(n.children)) return true;
-        }
-        return false;
-    };
-    return walk(doc.children);
+function existsIn(doc: Root, key: string, schema: Schema): boolean {
+    return buildIndex(doc, schema).get(key) !== undefined;
 }

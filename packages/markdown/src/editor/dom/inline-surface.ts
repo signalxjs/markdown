@@ -162,9 +162,9 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
     }
 
     function report(): void {
-        const flat = readInline(host);
+        const flat = readInline(host, init.schema);
         syncEmpty(flat);
-        if (!composing && flatEquals(flat, known)) return;
+        if (!composing && flatEquals(flat, known, init.schema)) return;
         known = flat;
         events.change({ flat, selection: currentRange(), composing });
     }
@@ -305,7 +305,7 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
     const onCompositionEnd = (): void => {
         if (!composing) return;
         composing = false;
-        const flat = readInline(host);
+        const flat = readInline(host, init.schema);
         syncEmpty(flat);
         known = flat;
         events.compositionEnd(flat);
@@ -377,7 +377,7 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
             // Compare with what the core knows, never with the live DOM: between
             // the browser's mutation and our `input` event a selection-only
             // transaction may push the (unchanged) content back.
-            if (flatEquals(flat, known)) return;
+            if (flatEquals(flat, known, init.schema)) return;
             const focused = d.activeElement === host || host.contains(d.activeElement);
             const range = focused ? currentRange() : null;
             known = flat;
@@ -410,7 +410,7 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
         blur() {
             if (d.activeElement === host) host.blur();
         },
-        getFlat: () => readInline(host),
+        getFlat: () => readInline(host, init.schema),
         getSelection() {
             const r = currentRange();
             if (r) return r;

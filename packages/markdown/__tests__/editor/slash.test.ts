@@ -4,7 +4,7 @@ import { toMarkdown } from '../../src/serializer/index.js';
 import { createEditor } from '../../src/editor/editor.js';
 import { createSlashPlugin } from '../../src/editor/slash.js';
 import { filterMenu, turnIntoCommand } from '../../src/editor/menu.js';
-import { builtinBlockEditors } from '../../src/editor/schema.js';
+import { standardNodes } from '../../src/schema/index.js';
 import { textSelection } from '../../src/editor/state.js';
 import type { TriggerItem, TriggerSelectApi } from '../../src/editor/trigger/index.js';
 import type { Command } from '../../src/editor/commands.js';
@@ -72,7 +72,7 @@ describe('createSlashPlugin', () => {
 
 describe('menu helpers', () => {
     it('turnIntoCommand converts inline kinds in place and wraps or inserts the rest', () => {
-        const specs = new Map(builtinBlockEditors.map((s) => [s.type, s]));
+        const specs = new Map(standardNodes.map((s) => [s.type, s]));
         const e = createEditor({ doc: parseMarkdown('a') });
         e.run(turnIntoCommand(specs.get('heading')!));
         expect(md(e)).toBe('# a\n');

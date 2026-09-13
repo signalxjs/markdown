@@ -17,15 +17,16 @@ import {
     toInline,
     toggleMark,
 } from '../../src/editor/inline-flat.js';
-import type { InlineKindSpec, InlineSpan } from '../../src/editor/inline-flat.js';
+import type { InlineSpan } from '../../src/editor/inline-flat.js';
+import { createSchema, markdownNodes, markdownSchema, standardNodes } from '../../src/schema/index.js';
 import type { PhrasingContent } from '../../src/ast/index.js';
 
 const md = (nodes: PhrasingContent[]) => toMarkdown({ type: 'root', children: [{ type: 'paragraph', children: nodes }] });
-const roundTrip = (src: string, opts?: Parameters<typeof toFlat>[1]) => md(toInline(toFlat(parseInline(src), opts), opts));
+const roundTrip = (src: string, schema = markdownSchema) => md(toInline(toFlat(parseInline(src), schema), schema));
 
 describe('toFlat / toInline', () => {
     it('flattens marks into ranges and rebuilds nested trees', () => {
-        const flat = toFlat(parseInline('a **b _c_** `d` [e](u "t")'));
+        const flat = toFlat(parseInline('a **b _c_** `d` [e](u "t")'), markdownSchema);
         expect(flat.text).toBe('a b c d e');
         expect(flat.spans).toEqual([
             { start: 2, end: 5, type: 'strong' },
@@ -33,34 +34,34 @@ describe('toFlat / toInline', () => {
             { start: 6, end: 7, type: 'inlineCode' },
             { start: 8, end: 9, type: 'link', attrs: { url: 'u', title: 't' } },
         ]);
-        expect(toInline(flat)).toEqual(parseInline('a **b _c_** `d` [e](u "t")'));
+        expect(toInline(flat, markdownSchema)).toEqual(parseInline('a **b _c_** `d` [e](u "t")'));
     });
 
     it('re-nests overlapping marks by extent so the tree is valid', () => {
         const flat = { text: 'abcd', spans: [{ start: 0, end: 3, type: 'strong' }, { start: 1, end: 4, type: 'emphasis' }] };
         // strong[0,3) and emphasis[1,4): emphasis stays active longer from
         // the overlap on, so it sits outside and strong closes/reopens.
-        expect(md(toInline(flat))).toBe('**a**_**bc**d_\n');
+        expect(md(toInline(flat, markdownSchema))).toBe('**a**_**bc**d_\n');
         // and the rebuilt tree flattens back to the same ranges
-        expect(flatEquals(toFlat(toInline(flat)), flat)).toBe(true);
+        expect(flatEquals(toFlat(toInline(flat, markdownSchema), markdownSchema), flat)).toBe(true);
     });
 
     it('keeps images as one atom character carrying attrs', () => {
-        const flat = toFlat(parseInline('x ![alt](u "t") y'));
+        const flat = toFlat(parseInline('x ![alt](u "t") y'), markdownSchema);
         expect(flat.text).toBe(`x ${ATOM_CHAR} y`);
         expect(flat.spans).toEqual([{ start: 2, end: 3, type: 'image', attrs: { url: 'u', alt: 'alt', title: 't' } }]);
-        expect(toInline(flat)).toEqual(parseInline('x ![alt](u "t") y'));
+        expect(toInline(flat, markdownSchema)).toEqual(parseInline('x ![alt](u "t") y'));
     });
 
     it('maps hard breaks to newlines and back', () => {
-        const flat = toFlat(parseInline('a  \nb'));
+        const flat = toFlat(parseInline('a  \nb'), markdownSchema);
         expect(flat.text).toBe('a\nb');
-        expect(toInline(flat)).toEqual([{ type: 'text', value: 'a' }, { type: 'break' }, { type: 'text', value: 'b' }]);
+        expect(toInline(flat, markdownSchema)).toEqual([{ type: 'text', value: 'a' }, { type: 'break' }, { type: 'text', value: 'b' }]);
     });
 
     it('suppresses marks inside code but keeps an enclosing link', () => {
         const flat = { text: 'code', spans: [{ start: 0, end: 4, type: 'inlineCode' }, { start: 1, end: 3, type: 'strong' }, { start: 0, end: 4, type: 'link', attrs: { url: 'u' } }] };
-        expect(md(toInline(flat))).toBe('[`code`](u)\n');
+        expect(md(toInline(flat, markdownSchema))).toBe('[`code`](u)\n');
     });
 
     it('round-trips through the serializer for a corpus', () => {
@@ -69,26 +70,28 @@ describe('toFlat / toInline', () => {
         }
     });
 
-    it('handles plugin atoms and marks through kinds', () => {
-        const kinds = new Map<string, InlineKindSpec>([
-            ['mention', { type: 'mention', kind: 'atom', fromFlat: (s) => ({ type: 'mention', id: s.attrs!.id, label: s.attrs!.label }) as never }],
-            ['highlight', { type: 'highlight', kind: 'mark' }],
+    it('handles plugin atoms and marks through their node specs', () => {
+        const schema = createSchema([
+            ...standardNodes,
+            ...markdownNodes,
+            { type: 'mention', role: 'atom', inline: { fromFlat: (s) => ({ type: 'mention', id: s.attrs!.id, label: s.attrs!.label }) as never } },
+            { type: 'highlight', role: 'mark' },
         ]);
         const plugins = resolvePlugins([mentionPlugin]);
         const nodes = parseInline('hi @[Andy](u1)!', { plugins });
-        const flat = toFlat(nodes, { kinds });
+        const flat = toFlat(nodes, schema);
         expect(flat.text).toBe(`hi ${ATOM_CHAR}!`);
         expect(flat.spans).toEqual([{ start: 3, end: 4, type: 'mention', attrs: { id: 'u1', label: 'Andy' } }]);
-        expect(toInline(flat, { kinds })).toEqual(nodes);
+        expect(toInline(flat, schema)).toEqual(nodes);
         const hl = { text: 'ab', spans: [{ start: 0, end: 1, type: 'highlight', attrs: { color: 'y' } }] };
-        expect(toInline(hl, { kinds })).toEqual([{ type: 'highlight', color: 'y', children: [{ type: 'text', value: 'a' }] }, { type: 'text', value: 'b' }]);
+        expect(toInline(hl, schema)).toEqual([{ type: 'highlight', color: 'y', children: [{ type: 'text', value: 'a' }] }, { type: 'text', value: 'b' }]);
     });
 
     it('keeps unresolved references as atoms', () => {
         const nodes = parseInline('see [foo][bar]');
-        const flat = toFlat(nodes);
+        const flat = toFlat(nodes, markdownSchema);
         expect(flat.spans[0]).toMatchObject({ type: 'linkReference', attrs: { identifier: 'bar', label: 'bar', referenceType: 'full', text: 'foo' } });
-        expect(toInline(flat)).toEqual(nodes);
+        expect(toInline(flat, markdownSchema)).toEqual(nodes);
     });
 });
 
@@ -149,13 +152,13 @@ describe('flat editing helpers', () => {
             { start: 2, end: 3, type: 'mention', attrs: { id: '1' } },
             { start: 3, end: 4, type: 'mention', attrs: { id: '1' } },
         ];
-        expect(mergeAdjacent(spans, text)).toEqual([
+        expect(mergeAdjacent(spans, text, markdownSchema)).toEqual([
             { start: 0, end: 2, type: 'strong' },
             { start: 0, end: 1, type: 'image', attrs: { url: 'u' } },
             { start: 2, end: 3, type: 'mention', attrs: { id: '1' } },
             { start: 3, end: 4, type: 'mention', attrs: { id: '1' } },
         ]);
-        expect(marksAt({ text, spans }, 1)).toEqual(['strong']);
+        expect(marksAt({ text, spans }, 1, 1, markdownSchema)).toEqual(['strong']);
     });
 
     it('toggleMark adds, merges and removes', () => {

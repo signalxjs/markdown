@@ -23,11 +23,11 @@ import type { MarkdownPlugin } from '../plugin/index.js';
 import type { Command, CommandContext, Dispatch } from './commands.js';
 import { commands as builtinCommands, pasteText, setDocument as setDocumentCommand } from './commands.js';
 import { createHistory, type History, type HistoryOptions } from './history.js';
-import type { InlineFlat, InlineKindSpec } from './inline-flat.js';
+import type { InlineFlat } from './inline-flat.js';
 import { applyEnterRules, applyInputRules, baseInputRules, type InputRule } from './input-rules.js';
 import { baseKeymap, resolveKeymap, runKeymap, type Keymap, type KeyName } from './keymap.js';
 import { editorSlice } from './plugin.js';
-import { createSchema, type BlockEditorSpec, type Schema } from './schema.js';
+import { createSchema, markdownNodes, standardNodes, type Schema } from '../schema/index.js';
 import { createState, selectionEquals, type EditorSelection, type EditorState } from './state.js';
 import { flatOf } from './steps.js';
 import { applyTransaction, type Transaction } from './transaction.js';
@@ -38,6 +38,8 @@ import type { PlatformInfo } from './surface.js';
 export interface EditorOptions {
     doc?: Root;
     plugins?: readonly MarkdownPlugin[];
+    /** The schema to edit with. Default: the standard and markdown specs plus every plugin's `nodes`. */
+    schema?: Schema;
     /** Extra keymap layered over the base and plugin keymaps (wins). */
     keymap?: Keymap;
     /** `false` disables input rules; an array replaces the base set. */
@@ -103,8 +105,7 @@ export function createEditor(options: EditorOptions = {}): Editor {
     const plugins = options.plugins ?? [];
     const slices = plugins.map((p) => ({ name: p.name, slice: editorSlice(p) }));
 
-    const blockEditors: BlockEditorSpec[] = [];
-    const kinds = new Map<string, InlineKindSpec>();
+    const nodes = plugins.flatMap((p) => p.nodes ?? []);
     const pluginCommands: Record<string, Command> = {};
     const keymaps: Keymap[] = [baseKeymap];
     const rules: InputRule[] = options.inputRules === false ? [] : [...(options.inputRules ?? baseInputRules)];
@@ -113,8 +114,6 @@ export function createEditor(options: EditorOptions = {}): Editor {
     const transactionHooks: NonNullable<ReturnType<typeof editorSlice>['onTransaction']>[] = [];
     const seenCommands = new Set<string>();
     for (const { name, slice } of slices) {
-        blockEditors.push(...(slice.blockEditors ?? []));
-        for (const k of slice.inline ?? []) kinds.set(k.type, k);
         for (const [cmd, fn] of Object.entries(slice.commands ?? {})) {
             if (__DEV__ && (seenCommands.has(cmd) || cmd in builtinCommands)) console.warn(`[@sigx/markdown] Plugin "${name}" redefines command "${cmd}".`);
             seenCommands.add(cmd);
@@ -128,14 +127,14 @@ export function createEditor(options: EditorOptions = {}): Editor {
     }
     if (options.keymap) keymaps.push(options.keymap);
 
-    const schema = createSchema(blockEditors);
+    const schema = options.schema ?? createSchema([...standardNodes, ...markdownNodes, ...nodes]);
     const allCommands: Record<string, Command> = { ...builtinCommands, ...pluginCommands };
     const keymap = resolveKeymap(keymaps, allCommands);
-    const ctx: CommandContext = { schema, inline: kinds.size ? { kinds } : undefined, parse: options.parse };
+    const ctx: CommandContext = { schema, parse: options.parse };
     const platform: PlatformInfo = { isMac: false, hasHardwareKeyboard: true, caretRectSpace: 'editor', ...options.platform };
     const history = createHistory(options.history);
 
-    let state = createState(options.doc ?? { type: 'root', children: [] }, null, { editableTypes: schema.editableTypes });
+    let state = createState(options.doc ?? { type: 'root', children: [] }, null, schema);
     const rev = signal(0);
     const selRev = signal(0);
     const listeners = new Set<EditorListener>();
@@ -170,13 +169,13 @@ export function createEditor(options: EditorOptions = {}): Editor {
             return;
         }
         if (readOnly && tr.steps.length && tr.meta.origin !== 'external') return;
-        const applied = applyTransaction(state, tr, { inline: ctx.inline }, schema.editableTypes);
+        const applied = applyTransaction(state, tr, ctx);
         commit(tr, applied.state, applied.inverse);
         // Input rules run on typing transactions and may produce a follow-up.
         if (tr.steps.length && tr.meta.origin !== 'inputRule' && tr.meta.origin !== 'history' && rules.length) {
             const follow = applyInputRules(rules, tr, state, ctx);
             if (follow) {
-                const a2 = applyTransaction(state, follow, { inline: ctx.inline }, schema.editableTypes);
+                const a2 = applyTransaction(state, follow, ctx);
                 commit(follow, a2.state, a2.inverse);
             }
         }
@@ -277,12 +276,12 @@ export function createEditor(options: EditorOptions = {}): Editor {
         paste: (text, markdown) => pasteText(markdown ?? text)(state, dispatch, ctx),
         flatOf: (key) => {
             const entry = state.index().get(key);
-            if (!entry || schema.kind(entry.node.type) !== 'inline') return null;
-            return flatOf(entry.node, { inline: ctx.inline });
+            if (!entry || schema.role(entry.node.type) !== 'textblock') return null;
+            return flatOf(entry.node, ctx);
         },
         valueOf: (key) => {
             const entry = state.index().get(key);
-            if (!entry || schema.kind(entry.node.type) !== 'code') return null;
+            if (!entry || schema.role(entry.node.type) !== 'code') return null;
             return (entry.node as { value: string }).value;
         },
         listen: (listener) => {

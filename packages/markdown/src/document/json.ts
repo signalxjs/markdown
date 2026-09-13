@@ -8,8 +8,8 @@
  * render or edit.
  */
 
-import { assignKeys } from './keys.js';
-import type { Node, Root, RootData } from './nodes.js';
+import { assignKeys, standardSchema, type Schema } from '../schema/index.js';
+import type { Node, Root, RootData } from '../ast/index.js';
 
 /** The JSON document format version `toJSON()` writes. */
 export const CURRENT_VERSION = 1;
@@ -28,6 +28,11 @@ export class MarkdownFormatError extends Error {
         this.name = 'MarkdownFormatError';
         this.code = code;
     }
+}
+
+export interface FromJSONOptions {
+    /** Decides which nodes get keys. Default: the standard schema (unknown types are keyed). */
+    schema?: Schema;
 }
 
 export interface ToJSONOptions {
@@ -72,7 +77,7 @@ function cloneValue(value: unknown): unknown {
  * object (or a JSON string). Throws `MarkdownFormatError` on a wrong shape or
  * a version newer than this package understands.
  */
-export function fromJSON(input: unknown): Root {
+export function fromJSON(input: unknown, options?: FromJSONOptions): Root {
     const json = typeof input === 'string' ? JSON.parse(input) : input;
     if (!isRecord(json) || json.type !== 'root' || !Array.isArray(json.children)) {
         throw new MarkdownFormatError('invalid-shape', 'Expected a root node with a children array.');
@@ -91,7 +96,7 @@ export function fromJSON(input: unknown): Root {
     }
     validateNodes(json.children, 'children');
     const root = cloneValue(json) as Root;
-    return assignKeys(root);
+    return assignKeys(root, options?.schema ?? standardSchema);
 }
 
 function validateNodes(nodes: unknown[], path: string): void {

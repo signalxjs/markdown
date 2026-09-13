@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseMarkdown } from '../../src/parser/index.js';
 import { toMarkdown } from '../../src/serializer/index.js';
-import { createSchema } from '../../src/editor/schema.js';
+import { markdownSchema } from '../../src/schema/index.js';
 import { createState, textSelection, blockSelection } from '../../src/editor/state.js';
 import type { EditorSelection, EditorState } from '../../src/editor/state.js';
 import type { BlockContent, Root } from '../../src/ast/index.js';
@@ -13,16 +13,16 @@ import type { Transaction } from '../../src/editor/transaction.js';
 import * as C from '../../src/editor/commands.js';
 import type { Command, CommandContext } from '../../src/editor/commands.js';
 
-const schema = createSchema();
+const schema = markdownSchema;
 const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
 
 /** Run a command against a document (markdown or a hand-built root) + selection; returns the resulting markdown, state and transaction. */
 function run(md: string | Root, selection: EditorSelection, command: Command) {
-    const state = createState(typeof md === 'string' ? parseMarkdown(md) : md, selection, { editableTypes: schema.editableTypes });
+    const state = createState(typeof md === 'string' ? parseMarkdown(md) : md, selection, schema);
     let tr: Transaction | null = null;
     const ok = command(state, (t) => (tr = t), ctx);
     if (!ok) return { ok, md: toMarkdown(state.doc), state, tr: null as Transaction | null };
-    const next = applyTransaction(state, tr!, {}, schema.editableTypes).state;
+    const next = applyTransaction(state, tr!, ctx).state;
     return { ok, md: toMarkdown(next.doc), state: next, tr: tr as Transaction | null };
 }
 
@@ -371,7 +371,7 @@ describe('commands registry', () => {
         for (const [name, cmd] of Object.entries(C.commands)) {
             expect(typeof cmd, name).toBe('function');
         }
-        const state: EditorState = createState(parseMarkdown('x'), at('b-0', 1), { editableTypes: schema.editableTypes });
+        const state: EditorState = createState(parseMarkdown('x'), at('b-0', 1), schema);
         expect(C.commands.toggleStrong(state, undefined, ctx)).toBe(false);
         expect(C.commands.setHeading2(state, undefined, ctx)).toBe(true);
     });

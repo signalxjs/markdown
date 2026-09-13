@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseMarkdown } from '../../src/parser/index.js';
 import { toMarkdown } from '../../src/serializer/index.js';
-import { createSchema } from '../../src/editor/schema.js';
+import { markdownSchema } from '../../src/schema/index.js';
 import { blockSelection, createState, textSelection } from '../../src/editor/state.js';
 import type { EditorSelection, EditorState } from '../../src/editor/state.js';
 import type { BlockContent, Root } from '../../src/ast/index.js';
@@ -10,7 +10,7 @@ import type { Command, CommandContext } from '../../src/editor/commands.js';
 import { defaultToolbarItems, toolbarState } from '../../src/editor/toolbar.js';
 import type { ToolbarContext, ToolbarItem, ToolbarState } from '../../src/editor/toolbar.js';
 
-const schema = createSchema();
+const schema = markdownSchema;
 const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
 const doc = (...children: BlockContent[]): Root => ({ type: 'root', children });
 const p = (text = ''): BlockContent => ({ type: 'paragraph', children: text ? [{ type: 'text', value: text }] : [] });
@@ -19,7 +19,7 @@ const at = (key: string, offset: number, to?: number) => textSelection(key, offs
 const history = (canUndo = false, canRedo = false) => ({ canUndo: () => canUndo, canRedo: () => canRedo });
 
 function stateOf(md: string | Root, selection: EditorSelection): EditorState {
-    return createState(typeof md === 'string' ? parseMarkdown(md) : md, selection, { editableTypes: schema.editableTypes });
+    return createState(typeof md === 'string' ? parseMarkdown(md) : md, selection, schema);
 }
 
 /** A toolbar context over a document: `run` applies the command and tracks undo/redo requests. */
@@ -31,7 +31,7 @@ function harness(md: string | Root, selection: EditorSelection) {
             return state;
         },
         dispatch: (tr) => {
-            state = applyTransaction(state, tr, {}, schema.editableTypes).state;
+            state = applyTransaction(state, tr, ctx).state;
         },
         ctx,
         run: (command) => {

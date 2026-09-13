@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { markdownSchema } from '../../../src/schema/index.js';
 import { createDomInlineSurface } from '../../../src/editor/dom/inline-surface.js';
 import type { DomInlineSurface } from '../../../src/editor/dom/inline-surface.js';
 import { ATOM_CHAR } from '../../../src/editor/inline-flat.js';
@@ -66,7 +67,7 @@ function events(over: Partial<InlineSurfaceEvents> = {}): InlineSurfaceEvents & 
     };
 }
 
-const make = (flat: InlineFlat, ev = events()) => ({ surface: create({ key: 'b-0', blockType: 'paragraph', attrs: {}, flat, readOnly: false, events: ev }), ev });
+const make = (flat: InlineFlat, ev = events()) => ({ surface: create({ key: 'b-0', blockType: 'paragraph', schema: markdownSchema, attrs: {}, flat, readOnly: false, events: ev }), ev });
 
 describe('DomInlineSurface', () => {
     it('sets the contenteditable host up with the a11y and state attributes', () => {
@@ -236,7 +237,7 @@ describe('DomInlineSurface', () => {
         document.body.appendChild(host);
         const ev = events();
         const flat: InlineFlat = { text: `a${ATOM_CHAR}`, spans: [{ start: 1, end: 2, type: 'mention', attrs: { id: '1', label: 'x' } }] };
-        const surface = createDomInlineSurface(host, { key: 'b-0', blockType: 'paragraph', attrs: {}, flat, readOnly: false, events: ev }, { platform: { isMac: false }, atoms });
+        const surface = createDomInlineSurface(host, { key: 'b-0', blockType: 'paragraph', schema: markdownSchema, attrs: {}, flat, readOnly: false, events: ev }, { platform: { isMac: false }, atoms });
         created.push(surface);
         surface.focus({ edge: 'end' });
         insertText(surface, '!');
@@ -248,7 +249,7 @@ describe('DomInlineSurface', () => {
         const onEmpty = vi.fn();
         const host = document.createElement('div');
         document.body.appendChild(host);
-        const surface = createDomInlineSurface(host, { key: 'b-0', blockType: 'paragraph', attrs: {}, flat: { text: '', spans: [] }, readOnly: false, events: events() }, { platform: { isMac: false }, onEmpty });
+        const surface = createDomInlineSurface(host, { key: 'b-0', blockType: 'paragraph', schema: markdownSchema, attrs: {}, flat: { text: '', spans: [] }, readOnly: false, events: events() }, { platform: { isMac: false }, onEmpty });
         created.push(surface);
         surface.setInline({ text: 'a', spans: [] });
         surface.setInline({ text: '', spans: [] });

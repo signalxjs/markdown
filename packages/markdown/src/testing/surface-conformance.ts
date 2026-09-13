@@ -9,6 +9,7 @@
  * ```
  */
 
+import { standardSchema } from '../schema/index.js';
 import type { InlineFlat } from '../editor/inline-flat.js';
 import { flatEquals } from '../editor/inline-flat.js';
 import type { BoundaryKey, InlineSurface, InlineSurfaceEvents, InlineSurfaceInit, Range, SurfaceBoundaryEvent, SurfaceChangeEvent } from '../editor/surface.js';
@@ -84,7 +85,7 @@ export function runInlineSurfaceConformance(h: ConformanceHarness): void {
     /** Create a surface for `flat`, run `body` against it, and always tear it down — on early return, a failed expectation or a throw alike. */
     const using = async (flat: InlineFlat, body: (surface: InlineSurface, log: Recorded) => Promise<void>, consume = true): Promise<void> => {
         const r = recorder(consume);
-        const surface = h.create({ key: 'b-0', blockType: 'paragraph', attrs: {}, flat, readOnly: false, events: r.events });
+        const surface = h.create({ key: 'b-0', blockType: 'paragraph', schema: standardSchema, attrs: {}, flat, readOnly: false, events: r.events });
         try {
             await body(surface, r.log);
         } finally {

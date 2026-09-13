@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_VERSION, MarkdownFormatError, fromJSON, toJSON } from '../../src/ast/index.js';
+import { CURRENT_VERSION, MarkdownFormatError, fromJSON, toJSON } from '../../src/document/index.js';
 import { parseMarkdown } from '../../src/parser/index.js';
 
 describe('toJSON / fromJSON', () => {

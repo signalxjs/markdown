@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { EXIT, SKIP, assignKeys, collectDefinitions, map, visit } from '../../src/ast/index.js';
+import { EXIT, SKIP, map, visit } from '../../src/ast/index.js';
+import { assignKeys } from '../../src/schema/index.js';
+import { collectDefinitions } from '../../src/document/index.js';
 import { parseMarkdown } from '../../src/parser/index.js';
 
 describe('visit / map / keys / definitions', () => {

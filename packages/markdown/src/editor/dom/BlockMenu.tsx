@@ -72,11 +72,11 @@ export const BlockMenu = component(({ onUnmounted }) => {
         track(editor.rev.value);
         const entry = editor.state.index().get(req.key);
         if (!entry) return undefined;
-        const kind = editor.schema.kind(entry.node.type);
+        const role = editor.schema.role(entry.node.type);
         const turnInto: MenuAction[] = editor.schema
             .menu()
             .filter((spec) => spec.type !== entry.node.type && spec.type !== 'table' && spec.type !== 'thematicBreak')
-            .filter((spec) => kind === 'inline' || kind === 'code' || spec.kind === 'inline')
+            .filter((spec) => role === 'textblock' || role === 'code' || spec.role === 'textblock')
             .map((spec) => ({ id: `turn:${spec.type}`, label: spec.menu!.label, icon: spec.menu!.icon, command: turnIntoCommand(spec) }));
         const actions: MenuAction[] = [
             { id: 'moveUp', label: 'Move up', icon: 'arrow-up', command: moveBlockUp },

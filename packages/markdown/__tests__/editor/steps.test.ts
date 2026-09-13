@@ -5,15 +5,20 @@ import { applyStep, invertStep, updateBlock } from '../../src/editor/steps.js';
 import type { Step } from '../../src/editor/steps.js';
 import { buildIndex } from '../../src/editor/state.js';
 import type { List, Paragraph, Root } from '../../src/ast/index.js';
+import { markdownSchema } from '../../src/schema/index.js';
+
+const ctx = { schema: markdownSchema };
+const apply = (root: Root, step: Step) => applyStep(root, step, ctx);
+const invert = (root: Root, step: Step) => invertStep(root, step, ctx);
 
 const doc = () => parseMarkdown('# Title\n\nHello **world**\n\n- a\n- b\n  - b1\n\n```ts\nx\n```');
 
 describe('applyStep — structural sharing', () => {
     it('replaces inline text and shares every other block', () => {
         const root = doc();
-        const plain = applyStep(root, { type: 'replaceInline', key: 'b-1', from: 6, to: 11, slice: { text: 'there', spans: [] } });
+        const plain = apply(root, { type: 'replaceInline', key: 'b-1', from: 6, to: 11, slice: { text: 'there', spans: [] } });
         expect(toMarkdown(plain.children[1])).toBe('Hello there\n'); // the inserted text carries only the slice's marks
-        const next = applyStep(root, { type: 'replaceInline', key: 'b-1', from: 6, to: 11, slice: { text: 'there', spans: [{ start: 0, end: 5, type: 'strong' }] } });
+        const next = apply(root, { type: 'replaceInline', key: 'b-1', from: 6, to: 11, slice: { text: 'there', spans: [{ start: 0, end: 5, type: 'strong' }] } });
         expect(toMarkdown(next.children[1])).toBe('Hello **there**\n');
         expect(next.children[0]).toBe(root.children[0]);
         expect(next.children[2]).toBe(root.children[2]);
@@ -25,7 +30,7 @@ describe('applyStep — structural sharing', () => {
 
     it('updates a nested block and shares its siblings', () => {
         const root = doc();
-        const next = applyStep(root, { type: 'setInline', key: 'b-2.1.1.0.0', flat: { text: 'B1', spans: [] } });
+        const next = apply(root, { type: 'setInline', key: 'b-2.1.1.0.0', flat: { text: 'B1', spans: [] } });
         const list = next.children[2] as List;
         const oldList = root.children[2] as List;
         expect(list.children[0]).toBe(oldList.children[0]);
@@ -35,56 +40,56 @@ describe('applyStep — structural sharing', () => {
 
     it('setValue and setAttrs', () => {
         const root = doc();
-        const v = applyStep(root, { type: 'setValue', key: 'b-3', value: 'y' });
+        const v = apply(root, { type: 'setValue', key: 'b-3', value: 'y' });
         expect((v.children[3] as { value: string }).value).toBe('y');
-        const a = applyStep(root, { type: 'setAttrs', key: 'b-0', attrs: { depth: 3 } });
+        const a = apply(root, { type: 'setAttrs', key: 'b-0', attrs: { depth: 3 } });
         expect((a.children[0] as { depth: number }).depth).toBe(3);
-        const cleared = applyStep(root, { type: 'setAttrs', key: 'b-3', attrs: { lang: undefined } });
+        const cleared = apply(root, { type: 'setAttrs', key: 'b-3', attrs: { lang: undefined } });
         expect('lang' in cleared.children[3]).toBe(false);
     });
 
     it('replaceBlock keeps the key and re-keys the new subtree', () => {
         const root = doc();
-        const next = applyStep(root, { type: 'replaceBlock', key: 'b-1', node: { type: 'heading', depth: 2, children: [{ type: 'text', value: 'H' }] } });
+        const next = apply(root, { type: 'replaceBlock', key: 'b-1', node: { type: 'heading', depth: 2, children: [{ type: 'text', value: 'H' }] } });
         expect(next.children[1]).toMatchObject({ type: 'heading', key: 'b-1', depth: 2 });
     });
 
     it('insertBlock / removeBlock re-key the siblings', () => {
         const root = doc();
-        const inserted = applyStep(root, { type: 'insertBlock', parentKey: null, index: 1, node: { type: 'thematicBreak' } });
+        const inserted = apply(root, { type: 'insertBlock', parentKey: null, index: 1, node: { type: 'thematicBreak' } });
         expect(inserted.children.map((c) => `${c.type}:${c.key}`)).toEqual(['heading:b-0', 'thematicBreak:b-1', 'paragraph:b-2', 'list:b-3', 'code:b-4']);
         const list = inserted.children[3] as List;
         expect(list.children[1].key).toBe('b-3.1');
         expect(list.children[1].children[1].key).toBe('b-3.1.1');
-        const removed = applyStep(inserted, { type: 'removeBlock', parentKey: null, index: 1 });
+        const removed = apply(inserted, { type: 'removeBlock', parentKey: null, index: 1 });
         expect(removed.children.map((c) => c.key)).toEqual(['b-0', 'b-1', 'b-2', 'b-3']);
-        const nested = applyStep(root, { type: 'insertBlock', parentKey: 'b-2', index: 0, node: { type: 'listItem', children: [{ type: 'paragraph', children: [{ type: 'text', value: 'z' }] }] } });
+        const nested = apply(root, { type: 'insertBlock', parentKey: 'b-2', index: 0, node: { type: 'listItem', children: [{ type: 'paragraph', children: [{ type: 'text', value: 'z' }] }] } });
         expect(toMarkdown(nested.children[2])).toBe('- z\n- a\n- b\n  - b1\n');
         expect((nested.children[2] as List).children.map((i) => i.key)).toEqual(['b-2.0', 'b-2.1', 'b-2.2']);
     });
 
     it('moveBlock within a parent and across parents', () => {
         const root = doc();
-        const up = applyStep(root, { type: 'moveBlock', key: 'b-3', to: { parentKey: null, index: 0 } });
+        const up = apply(root, { type: 'moveBlock', key: 'b-3', to: { parentKey: null, index: 0 } });
         expect(up.children.map((c) => c.type)).toEqual(['code', 'heading', 'paragraph', 'list']);
-        const down = applyStep(root, { type: 'moveBlock', key: 'b-0', to: { parentKey: null, index: 4 } });
+        const down = apply(root, { type: 'moveBlock', key: 'b-0', to: { parentKey: null, index: 4 } });
         expect(down.children.map((c) => c.type)).toEqual(['paragraph', 'list', 'code', 'heading']);
-        const into = applyStep(root, { type: 'moveBlock', key: 'b-1', to: { parentKey: 'b-2.0', index: 1 } });
+        const into = apply(root, { type: 'moveBlock', key: 'b-1', to: { parentKey: 'b-2.0', index: 1 } });
         expect(toMarkdown(into.children[1])).toBe('- a\n\n  Hello **world**\n- b\n  - b1\n');
-        expect(() => applyStep(root, { type: 'moveBlock', key: 'b-2', to: { parentKey: 'b-2.0', index: 0 } })).toThrow(/into itself/);
+        expect(() => apply(root, { type: 'moveBlock', key: 'b-2', to: { parentKey: 'b-2.0', index: 0 } })).toThrow(/into itself/);
     });
 
     it('rejects unknown keys and out-of-range ranges', () => {
         const root = doc();
-        expect(() => applyStep(root, { type: 'setValue', key: 'nope', value: '' })).toThrow(/Unknown block key/);
-        expect(() => applyStep(root, { type: 'replaceInline', key: 'b-1', from: 0, to: 99, slice: { text: '', spans: [] } })).toThrow(/outside/);
-        expect(() => applyStep(root, { type: 'setInline', key: 'b-2', flat: { text: '', spans: [] } })).toThrow(/no inline content/);
+        expect(() => apply(root, { type: 'setValue', key: 'nope', value: '' })).toThrow(/Unknown block key/);
+        expect(() => apply(root, { type: 'replaceInline', key: 'b-1', from: 0, to: 99, slice: { text: '', spans: [] } })).toThrow(/outside/);
+        expect(() => apply(root, { type: 'setInline', key: 'b-2', flat: { text: '', spans: [] } })).toThrow(/no inline content/);
     });
 
     it('updateBlock throws for an unknown key and keeps identity elsewhere', () => {
         const root = doc();
-        expect(() => updateBlock(root, 'x', (n) => n)).toThrow();
-        const same = updateBlock(root, 'b-1', (n) => n);
+        expect(() => updateBlock(root, 'x', (n) => n, markdownSchema)).toThrow();
+        const same = updateBlock(root, 'b-1', (n) => n, markdownSchema);
         expect(same.children[1]).toBe(root.children[1]);
     });
 });
@@ -106,9 +111,9 @@ describe('invertStep', () => {
     for (const step of cases) {
         it(`round-trips ${step.type}`, () => {
             const root = doc();
-            const inverse = invertStep(root, step);
-            const applied = applyStep(root, step);
-            const back = applyStep(applied, inverse);
+            const inverse = invert(root, step);
+            const applied = apply(root, step);
+            const back = apply(applied, inverse);
             expect(toMarkdown(back)).toBe(toMarkdown(root));
             expect(strip(back)).toEqual(strip(root));
         });
@@ -121,7 +126,7 @@ describe('invertStep', () => {
         let cur: Root = root;
         const inverses: Step[] = [];
         for (let i = 0; i < 40; i++) {
-            const index = buildIndex(cur);
+            const index = buildIndex(cur, markdownSchema);
             const editable = index.editable().filter((k) => (index.get(k)!.node as { type: string }).type !== 'code');
             const key = editable[Math.floor(rnd() * editable.length)];
             const flat = (index.get(key)!.node as Paragraph).children;
@@ -131,10 +136,10 @@ describe('invertStep', () => {
             const step: Step = rnd() < 0.7
                 ? { type: 'replaceInline', key, from, to, slice: { text: rnd() < 0.5 ? 'x' : '', spans: [] } }
                 : { type: 'insertBlock', parentKey: null, index: Math.floor(rnd() * (cur.children.length + 1)), node: { type: 'paragraph', children: [{ type: 'text', value: 'p' }] } };
-            inverses.push(invertStep(cur, step));
-            cur = applyStep(cur, step);
+            inverses.push(invert(cur, step));
+            cur = apply(cur, step);
         }
-        for (const inv of inverses.reverse()) cur = applyStep(cur, inv);
+        for (const inv of inverses.reverse()) cur = apply(cur, inv);
         expect(strip(cur)).toEqual(strip(root));
     });
 });

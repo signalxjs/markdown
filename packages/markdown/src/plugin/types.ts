@@ -13,6 +13,7 @@
  */
 
 import type { BlockContent, Node, Parent, PhrasingContent, Position } from '../ast/index.js';
+import type { NodeSpec } from '../schema/index.js';
 
 // ---------------------------------------------------------------------------
 // Block syntax extensions
@@ -152,6 +153,8 @@ export interface MarkdownPlatformComponents {}
 export interface MarkdownPlugin {
     /** Unique plugin name; a duplicate is dropped with a dev warning. */
     name: string;
+    /** Node types this plugin adds to the vocabulary (their role, editing and flat-model mapping). */
+    nodes?: readonly NodeSpec[];
     /** Block-level syntax. Tried before the built-in block starts. */
     // oxlint-disable-next-line no-explicit-any
     block?: readonly BlockSyntaxExtension<any, any>[];

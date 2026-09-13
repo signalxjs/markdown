@@ -11,6 +11,7 @@
  * own (`b`, `i`, `s`, `strike`).
  */
 
+import type { Schema } from '../../schema/index.js';
 import { ATOM_CHAR, mergeAdjacent, normalizeSpans } from '../inline-flat.js';
 import type { InlineFlat, InlineSpan } from '../inline-flat.js';
 
@@ -160,7 +161,7 @@ function makeAtom(span: InlineSpan, d: Document, opts: RenderOptions): HTMLEleme
 // ---------------------------------------------------------------------------
 
 /** Read the host's content back into a flat model. Tolerant: unknown elements are transparent, `<b>`/`<i>`/`<s>` are marks. */
-export function readInline(host: HTMLElement): InlineFlat {
+export function readInline(host: HTMLElement, schema?: Schema): InlineFlat {
     let text = '';
     const spans: InlineSpan[] = [];
     const walk = (node: Node, active: InlineSpan[]): void => {
@@ -211,7 +212,7 @@ export function readInline(host: HTMLElement): InlineFlat {
         for (const child of Array.from(el.childNodes)) walk(child, next);
     };
     for (const child of Array.from(host.childNodes)) walk(child, []);
-    return { text, spans: mergeAdjacent(spans, text) };
+    return { text, spans: mergeAdjacent(spans, text, schema) };
 }
 
 function readAttrs(el: HTMLElement): Record<string, string> {

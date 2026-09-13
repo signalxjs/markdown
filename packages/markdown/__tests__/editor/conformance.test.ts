@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { markdownSchema } from '../../src/schema/index.js';
 import { createFakeInlineSurface } from '../../src/testing/fake-surface.js';
 import { runInlineSurfaceConformance } from '../../src/testing/surface-conformance.js';
 import type { FakeInlineSurface } from '../../src/testing/fake-surface.js';
@@ -36,6 +37,7 @@ describe('FakeInlineSurface driver', () => {
         createFakeInlineSurface({
             key: 'b-0',
             blockType: 'paragraph',
+            schema: markdownSchema,
             attrs: {},
             flat: { text, spans: [] },
             readOnly,

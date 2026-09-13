@@ -120,11 +120,11 @@ export const BlockView = component<BlockViewProps>(({ props }) => {
 
     return (): JSXElement => {
         const node = props.block;
-        const kind = editor.schema.kind(node.type) ?? 'void';
+        const role = editor.schema.role(node.type) ?? 'void';
         const handle = view.handles() ? <BlockHandle blockKey={node.key!} /> : null;
 
-        switch (kind) {
-            case 'inline':
+        switch (role) {
+            case 'textblock':
                 return (
                     <div {...wrapperAttrs(view, node)}>
                         {handle}
