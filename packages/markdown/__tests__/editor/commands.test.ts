@@ -335,13 +335,13 @@ describe('selection and document commands', () => {
 describe('setBlockType selection', () => {
     it('clamps the caret when the conversion drops hard breaks, so the next edit never throws', () => {
         const para: BlockContent = { type: 'paragraph', children: [{ type: 'text', value: 'a' }, { type: 'break' }, { type: 'text', value: 'b' }] };
-        const r = run(doc(para), at('b-0', 3), C.setHeading1);
+        const r = run(doc(para), at('b-0', 3), C.setBlockType('heading', { depth: 1 }));
         expect(r.md).toBe('# ab\n');
         expect(r.state.selection).toEqual(at('b-0', 2));
         let next = r.state;
         expect(C.insertText('!')(r.state, (t) => void (next = applyTransaction(r.state, t, ctx).state), ctx)).toBe(true);
         expect(toMarkdown(next.doc)).toBe('# ab!\n');
-        const code = run(doc(para), at('b-0', 3), C.setCodeBlock);
+        const code = run(doc(para), at('b-0', 3), C.setBlockType('code'));
         expect(code.state.selection).toEqual(at('b-0', 3));
     });
 });
