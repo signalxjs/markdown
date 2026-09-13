@@ -3,7 +3,7 @@ import { parseInline } from '../../../src/parser/index.js';
 import { ATOM_CHAR, flatEquals, toFlat } from '../../../src/editor/inline-flat.js';
 import { hostLength, offsetToPoint, pointToOffset, readInline, renderInline } from '../../../src/editor/dom/inline-dom.js';
 import type { InlineFlat } from '../../../src/editor/inline-flat.js';
-import { markdownSchema } from '../../../src/schema/index.js';
+import { createSchema, markdownSchema, standardNodes } from '../../../src/schema/index.js';
 
 const host = () => document.createElement('div');
 const flatOf = (md: string): InlineFlat => toFlat(parseInline(md), markdownSchema);
@@ -12,7 +12,7 @@ describe('renderInline / readInline', () => {
     it('renders marks as semantic tags and reads them back', () => {
         const h = host();
         const flat = flatOf('a **b _c_** `d` [e](u "t") ~~f~~');
-        renderInline(h, flat);
+        renderInline(h, flat, { schema: markdownSchema });
         expect(h.innerHTML).toBe('a <strong>b <em>c</em></strong> <code>d</code> <a href="u" data-url="u" title="t">e</a> <del>f</del>');
         expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
     });
@@ -20,7 +20,7 @@ describe('renderInline / readInline', () => {
     it('round-trips overlapping marks (close/reopen) and merges them back', () => {
         const h = host();
         const flat: InlineFlat = { text: 'abcd', spans: [{ start: 0, end: 3, type: 'strong' }, { start: 1, end: 4, type: 'emphasis' }] };
-        renderInline(h, flat);
+        renderInline(h, flat, { schema: markdownSchema });
         expect(h.innerHTML).toBe('<strong>a<em>bc</em></strong><em>d</em>');
         expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
     });
@@ -36,7 +36,7 @@ describe('renderInline / readInline', () => {
         expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
         // A mark wrapping an atom survives too.
         const wrapped: InlineFlat = { text: `${ATOM_CHAR}x`, spans: [{ start: 0, end: 1, type: 'image', attrs: { url: 'u', alt: 'a' } }, { start: 0, end: 2, type: 'strong' }] };
-        renderInline(h, wrapped);
+        renderInline(h, wrapped, { schema: markdownSchema });
         expect(flatEquals(readInline(h, markdownSchema), wrapped, markdownSchema)).toBe(true);
     });
 
@@ -64,15 +64,41 @@ describe('renderInline / readInline', () => {
     it('renders plugin marks as span[data-mark] with attrs', () => {
         const h = host();
         const flat: InlineFlat = { text: 'ab', spans: [{ start: 0, end: 1, type: 'highlight', attrs: { color: 'y' } }] };
-        renderInline(h, flat);
+        renderInline(h, flat, { schema: markdownSchema });
         expect(h.innerHTML).toBe('<span data-mark="highlight" data-attrs="{&quot;color&quot;:&quot;y&quot;}">a</span>b');
         expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
+    });
+
+    it('renders a plugin mark with an html hint as that tag, nests by priority and reads the aliases back', () => {
+        const schema = createSchema([
+            ...standardNodes,
+            { type: 'highlight', role: 'mark', inline: { priority: 1 }, html: { tag: 'mark', aliases: ['hl'] } },
+        ]);
+        const h = host();
+        const flat: InlineFlat = { text: 'ab', spans: [{ start: 0, end: 2, type: 'strong' }, { start: 0, end: 2, type: 'highlight', attrs: { color: 'y' } }] };
+        renderInline(h, flat, { schema });
+        // Priority 1 sits outside strong (2); the attrs ride along as data-attrs.
+        expect(h.innerHTML).toBe('<mark data-attrs="{&quot;color&quot;:&quot;y&quot;}"><strong>ab</strong></mark>');
+        expect(flatEquals(readInline(h, schema), flat, schema)).toBe(true);
+        h.innerHTML = '<hl>a</hl>b';
+        expect(readInline(h, schema).spans).toEqual([{ start: 0, end: 1, type: 'highlight' }]);
+    });
+
+    it('renders every mark as span[data-mark] without a schema', () => {
+        const h = host();
+        const flat: InlineFlat = { text: 'ab', spans: [{ start: 0, end: 1, type: 'strong' }] };
+        renderInline(h, flat);
+        expect(h.innerHTML).toBe('<span data-mark="strong">a</span>b');
+        expect(readInline(h).spans).toEqual([{ start: 0, end: 1, type: 'strong' }]);
+        // A semantic tag is transparent to a schema-less read.
+        h.innerHTML = '<strong>a</strong>b';
+        expect(readInline(h)).toEqual({ text: 'ab', spans: [] });
     });
 
     it('keeps the autolink flag through the DOM', () => {
         const h = host();
         const flat = flatOf('<https://x.com>');
-        renderInline(h, flat);
+        renderInline(h, flat, { schema: markdownSchema });
         expect(h.querySelector('a')!.hasAttribute('data-autolink')).toBe(true);
         expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
     });
@@ -85,7 +111,7 @@ describe('offsetToPoint / pointToOffset', () => {
             text: `ab${ATOM_CHAR}c\nd`,
             spans: [{ start: 0, end: 2, type: 'strong' }, { start: 2, end: 3, type: 'mention', attrs: { id: '1', label: 'x' } }, { start: 1, end: 4, type: 'emphasis' }],
         };
-        renderInline(h, flat);
+        renderInline(h, flat, { schema: markdownSchema });
         expect(hostLength(h)).toBe(6);
         for (let o = 0; o <= 6; o++) {
             const p = offsetToPoint(h, o);

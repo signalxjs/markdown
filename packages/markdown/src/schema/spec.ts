@@ -58,6 +58,13 @@ export interface InlineFlatSpec<N extends Node = Node> {
     fromFlat?(span: InlineSpan, children: PhrasingContent[]): PhrasingContent;
 }
 
+/** The HTML element a node maps to — a data-only hint the DOM editor renders marks with (and reads back, aliases included) and an HTML format can default to. */
+export interface HtmlTagHint {
+    tag: string;
+    /** Further tags read as this node (the ones browsers insert on their own: `b` for `strong`). */
+    aliases?: readonly string[];
+}
+
 export interface BlockMenuEntry {
     label: string;
     icon?: string;
@@ -152,6 +159,8 @@ export interface NodeSpec<N extends Node = Node> {
     collect?(node: N, env: RenderEnv): void;
     /** The component may return a plain string — the node needs no element of its own (raw HTML rendered as text). Silences the string-block warning. */
     textOutput?: boolean;
+    /** The HTML element this node maps to (see `HtmlTagHint`). */
+    html?: HtmlTagHint;
 }
 
 export interface Schema {

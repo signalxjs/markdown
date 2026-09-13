@@ -30,7 +30,7 @@ let instances = 0;
 
 export const SuggestionPopup = component<SuggestionPopupProps>(({ props }) => {
     /** A per-instance default id: several editors on one page must not share `aria-activedescendant` targets. */
-    const defaultId = `markdown-suggest-${++instances}`;
+    const defaultId = `richtext-suggest-${++instances}`;
     const onPointerDown = (e: PointerEvent): void => {
         e.preventDefault();
     };

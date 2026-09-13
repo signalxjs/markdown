@@ -1,11 +1,11 @@
 /**
  * The styling seam of the default DOM components: every element carries
- * `data-scope="markdown"` and `data-part="<name>"` (the zero convention —
+ * `data-scope="richtext"` and `data-part="<name>"` (the zero convention —
  * attributes, never classes), plus an optional class when a `classPrefix` is
  * given for stylesheets that prefer class selectors.
  */
 
-export const SCOPE = 'markdown';
+export const SCOPE = 'richtext';
 
 export interface PartAttrs {
     'data-scope': string;

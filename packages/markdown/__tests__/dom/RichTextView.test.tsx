@@ -31,7 +31,7 @@ describe('RichTextView (default components)', () => {
         const c = mount(jsx(RichTextView, { format: markdownFormat, value: '# Hi\n\nSome **bold** `code` and [a link](https://x.com "T").\n\n- one\n- [x] done\n\n---\n\n> q\n\n| a | b |\n| :-- | --: |\n| 1 | 2 |\n\n```ts\nconst x = 1;\n```' }));
         const root = c.firstElementChild as HTMLElement;
         expect(root.tagName).toBe('DIV');
-        expect(root.getAttribute('data-scope')).toBe('markdown');
+        expect(root.getAttribute('data-scope')).toBe('richtext');
         expect(root.getAttribute('data-part')).toBe('root');
         expect(root.className).toBe('');
         const h = root.querySelector('[data-part=heading]') as HTMLElement;

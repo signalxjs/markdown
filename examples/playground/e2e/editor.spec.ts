@@ -104,7 +104,7 @@ test('the toolbar toggles marks on the selection', async ({ page }) => {
     const p = block(page, 'b-0');
     await p.click();
     await page.keyboard.press('Control+a');
-    const bold = page.locator('#editor [data-scope="markdown-toolbar"] [data-item="bold"]');
+    const bold = page.locator('#editor [data-scope="richtext-toolbar"] [data-item="bold"]');
     await expect(bold).toHaveAttribute('data-state', 'off');
     await bold.click();
     await expect(p.locator('strong')).toHaveText('hello');
@@ -140,7 +140,7 @@ test('the block menu turns a paragraph into a heading', async ({ page }) => {
     const wrapper = page.locator('#editor [data-part="block"][data-key="b-0"]');
     await wrapper.hover();
     await wrapper.locator('> [data-part="handle"]').click();
-    const menu = page.locator('[data-scope="markdown-block-menu"][role="menu"]');
+    const menu = page.locator('[data-scope="richtext-block-menu"][role="menu"]');
     await expect(menu).toBeVisible();
     await menu.locator('[data-action="turn:heading"]').click();
     await expect(menu).toHaveCount(0);
@@ -153,7 +153,7 @@ test('slash commands insert a divider below the paragraph', async ({ page }) => 
     await p.click();
     await page.keyboard.press('End');
     await page.keyboard.type(' /div');
-    const popup = page.locator('[data-scope="markdown-suggest"][role="listbox"]');
+    const popup = page.locator('[data-scope="richtext-suggest"][role="listbox"]');
     await expect(popup.locator('[role="option"]')).toHaveText(['Divider']);
     await page.keyboard.press('Enter');
     await expect(popup).toHaveCount(0);
@@ -166,7 +166,7 @@ test('mentions: @ opens the people list and a pick inserts a chip', async ({ pag
     await p.click();
     await page.keyboard.press('End');
     await page.keyboard.type(' @be');
-    const popup = page.locator('[data-scope="markdown-suggest"][role="listbox"]');
+    const popup = page.locator('[data-scope="richtext-suggest"][role="listbox"]');
     await expect(popup.locator('[role="option"]')).toHaveText(['Bea']);
     await page.keyboard.press('Enter');
     await expect(p.locator('[data-atom="mention"]')).toHaveText('@Bea');

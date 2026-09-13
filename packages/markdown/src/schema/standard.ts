@@ -149,13 +149,14 @@ export const standardNodes: readonly NodeSpec[] = [
     { type: 'tableRow', role: 'container', isolating: true, props: (_node, ctx) => ({ header: ctx.index === 0, index: ctx.index }) },
     { type: 'text', role: 'inline', props: (node) => ({ value: (node as Literal).value }), text: (node) => (node as Literal).value },
     { type: 'break', role: 'inline', inline: { kind: 'break' }, text: () => '\n' },
-    { type: 'strong', role: 'mark', inline: { priority: 2 } },
-    { type: 'emphasis', role: 'mark', inline: { priority: 3 } },
-    { type: 'delete', role: 'mark', inline: { priority: 4 } },
-    { type: 'inlineCode', role: 'mark', inline: { literal: true, priority: 1 }, props: (node) => ({ value: (node as Literal).value }), text: (node) => (node as Literal).value },
+    { type: 'strong', role: 'mark', inline: { priority: 2 }, html: { tag: 'strong', aliases: ['b'] } },
+    { type: 'emphasis', role: 'mark', inline: { priority: 3 }, html: { tag: 'em', aliases: ['i'] } },
+    { type: 'delete', role: 'mark', inline: { priority: 4 }, html: { tag: 'del', aliases: ['s', 'strike'] } },
+    { type: 'inlineCode', role: 'mark', inline: { literal: true, priority: 1 }, html: { tag: 'code' }, props: (node) => ({ value: (node as Literal).value }), text: (node) => (node as Literal).value },
     {
         type: 'link',
         role: 'mark',
+        html: { tag: 'a' },
         inline: {
             wrapsLiteral: true,
             priority: 0,

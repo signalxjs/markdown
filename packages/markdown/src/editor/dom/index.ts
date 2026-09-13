@@ -1,13 +1,15 @@
 /**
- * `@sigx/markdown/editor/dom` — the web block editor: `<MarkdownEditor>`,
+ * `@sigx/markdown/editor/dom` — the web block editor: `<RichTextEditor>`,
  * its chrome, the contenteditable and textarea surfaces, and the DOM pieces
  * of the reference plugins (mention chips).
  */
 
-export { MarkdownEditor } from './MarkdownEditor.js';
-export type { MarkdownEditorProps, MarkdownEditorController, MarkdownEditorChange } from './MarkdownEditor.js';
+export { RichTextEditor } from './RichTextEditor.js';
+export type { RichTextEditorProps, RichTextEditorController, RichTextEditorChange } from './RichTextEditor.js';
 export { BlockView } from './BlockView.js';
 export type { BlockViewProps } from './BlockView.js';
+export { standardContainerViews, defaultContainerView } from './containers.js';
+export type { ContainerView, ContainerViewProps } from './containers.js';
 export { InlineBlock } from './InlineBlock.js';
 export type { InlineBlockProps } from './InlineBlock.js';
 export { CodeBlockEditor } from './CodeBlockEditor.js';
@@ -31,8 +33,8 @@ export { selectionFor, rangeIn, caretClientRect, relativeCaretRect, onEdgeLine, 
 
 export { createDomMentionPlugin, mentionChip } from './mention.js';
 export type { DomMentionOptions } from './mention.js';
-export { domEditorSlice, pluginAtomRenderers } from './plugin-atoms.js';
-export type { DomEditorSlice } from './plugin-atoms.js';
+export { domEditorSlice, pluginAtomRenderers, pluginContainerViews } from './plugin-dom.js';
+export type { DomEditorSlice } from './plugin-dom.js';
 
 export {
     EDITOR_SCOPE,

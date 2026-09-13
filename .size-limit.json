@@ -44,7 +44,7 @@
   {
     "name": "@sigx/markdown/editor/dom",
     "path": "packages/markdown/dist/editor/dom.prod.js",
-    "limit": "48 KB",
+    "limit": "36 KB",
     "ignore": [
       "@sigx/markdown",
       "@sigx/reactivity",

@@ -5,10 +5,11 @@
  *
  * Ported from `@sigx/lynx-richtext`'s web element and reduced to a single
  * line: no block segmentation, hard breaks are `<br data-break>`, atoms are
- * `contenteditable=false` spans rendered by an atom renderer, marks are
- * `strong` / `em` / `del` / `code` / `a[data-url]` plus plugin marks as
- * `span[data-mark]`. Read-back also accepts the tags browsers insert on their
- * own (`b`, `i`, `s`, `strike`).
+ * `contenteditable=false` spans rendered by an atom renderer. A mark renders
+ * as the element its spec names (`spec.html.tag` — `strong`, `em`, `del`,
+ * `code`, `a`) and any mark without one as `span[data-mark]`; read-back also
+ * accepts the spec's `aliases` (the tags browsers insert on their own: `b`,
+ * `i`, `s`, `strike`). Nesting order on ties follows `spec.inline.priority`.
  */
 
 import type { Schema } from '../../schema/index.js';
@@ -27,14 +28,38 @@ export interface RenderOptions {
     atoms?: ReadonlyMap<string, AtomRenderer>;
     /** Fallback for atom types without a renderer. Default: a span showing the type. */
     defaultAtom?: AtomRenderer;
+    /** The schema the mark elements come from (`spec.html.tag`, nesting by `spec.inline.priority`). Without it every mark is a `span[data-mark]`. */
+    schema?: Schema;
 }
 
-const MARK_TAG: Record<string, string> = { strong: 'strong', emphasis: 'em', delete: 'del', inlineCode: 'code' };
-const TAG_MARK: Record<string, string> = { strong: 'strong', b: 'strong', em: 'emphasis', i: 'emphasis', del: 'delete', s: 'delete', strike: 'delete', code: 'inlineCode' };
+const DEFAULT_PRIORITY = 99;
 
-/** Outer-to-inner nesting when several marks cover the same run. */
-const ORDER: Record<string, number> = { link: 0, strong: 1, emphasis: 2, delete: 3, inlineCode: 4 };
-const order = (type: string): number => ORDER[type] ?? 5;
+function markTag(schema: Schema | undefined, type: string): string | undefined {
+    return schema?.get(type)?.html?.tag;
+}
+
+function priority(schema: Schema | undefined, type: string): number {
+    return schema?.get(type)?.inline?.priority ?? DEFAULT_PRIORITY;
+}
+
+/** Tag (and alias) → mark type, per schema. */
+const tagMaps = new WeakMap<Schema, ReadonlyMap<string, string>>();
+
+function tagMap(schema: Schema | undefined): ReadonlyMap<string, string> {
+    if (!schema) return new Map();
+    let map = tagMaps.get(schema);
+    if (!map) {
+        const m = new Map<string, string>();
+        for (const spec of schema.specs.values()) {
+            if (spec.role !== 'mark' || !spec.html) continue;
+            m.set(spec.html.tag, spec.type);
+            for (const alias of spec.html.aliases ?? []) m.set(alias, spec.type);
+        }
+        map = m;
+        tagMaps.set(schema, map);
+    }
+    return map;
+}
 
 function isAtomSpan(flat: InlineFlat, s: InlineSpan): boolean {
     return s.end - s.start === 1 && flat.text[s.start] === ATOM_CHAR;
@@ -56,11 +81,12 @@ export function defaultAtomRenderer(span: InlineSpan, d: Document): HTMLElement 
  * Marks are opened and closed like tags over the text: at every position the
  * set of active marks is compared with the stack of open elements, the stack is
  * unwound to the common prefix and the remaining marks are opened (outer to
- * inner by `ORDER`, then by start). Properly nested marks therefore render as
+ * inner by priority, then by start). Properly nested marks therefore render as
  * nested elements and overlapping marks close and reopen.
  */
 export function renderInline(host: HTMLElement, flat: InlineFlat, opts: RenderOptions = {}): void {
     const d = host.ownerDocument;
+    const { schema } = opts;
     const frag = d.createDocumentFragment();
     const { text } = flat;
     const spans = normalizeSpans(flat.spans);
@@ -73,13 +99,13 @@ export function renderInline(host: HTMLElement, flat: InlineFlat, opts: RenderOp
     let i = 0;
     while (i < text.length) {
         // Reconcile the open stack with the marks active here.
-        const active = marksAt(marks, i);
+        const active = marksAt(marks, i, schema);
         let keep = 0;
         while (keep < stack.length && keep < active.length && sameMark(stack[keep].span, active[keep])) keep++;
         // Anything open beyond the prefix closes; an open mark not in `active` also forces everything above it to close.
         stack.length = keep;
         for (let k = keep; k < active.length; k++) {
-            const el = markElement(active[k], d);
+            const el = markElement(active[k], d, schema);
             parent().appendChild(el);
             stack.push({ span: active[k], el });
         }
@@ -99,7 +125,7 @@ export function renderInline(host: HTMLElement, flat: InlineFlat, opts: RenderOp
         }
         // The longest run with the same marks, stopping at atoms and breaks.
         let j = i + 1;
-        while (j < text.length && text[j] !== '\n' && !atoms.some((s) => s.start === j) && sameMarks(marksAt(marks, j), active)) j++;
+        while (j < text.length && text[j] !== '\n' && !atoms.some((s) => s.start === j) && sameMarks(marksAt(marks, j, schema), active)) j++;
         parent().appendChild(d.createTextNode(text.slice(i, j)));
         i = j;
     }
@@ -112,8 +138,8 @@ export function renderInline(host: HTMLElement, flat: InlineFlat, opts: RenderOp
     host.replaceChildren(frag);
 }
 
-function marksAt(marks: readonly InlineSpan[], at: number): InlineSpan[] {
-    return marks.filter((s) => s.start <= at && s.end > at).sort((a, b) => order(a.type) - order(b.type) || a.start - b.start || b.end - a.end);
+function marksAt(marks: readonly InlineSpan[], at: number, schema: Schema | undefined): InlineSpan[] {
+    return marks.filter((s) => s.start <= at && s.end > at).sort((a, b) => priority(schema, a.type) - priority(schema, b.type) || a.start - b.start || b.end - a.end);
 }
 
 function sameMark(a: InlineSpan, b: InlineSpan): boolean {
@@ -124,21 +150,20 @@ function sameMarks(a: readonly InlineSpan[], b: readonly InlineSpan[]): boolean 
     return a.length === b.length && a.every((s, k) => sameMark(s, b[k]));
 }
 
-function markElement(s: InlineSpan, d: Document): HTMLElement {
-    let el: HTMLElement;
-    if (s.type === 'link') {
-        el = d.createElement('a');
+function markElement(s: InlineSpan, d: Document, schema: Schema | undefined): HTMLElement {
+    const tag = markTag(schema, s.type);
+    if (tag === 'a') {
+        // A link's attrs are real anchor attributes (the browser follows `href`; `data-url` keeps the raw value).
+        const el = d.createElement('a');
         el.setAttribute('href', s.attrs?.url ?? '');
         el.setAttribute('data-url', s.attrs?.url ?? '');
         if (s.attrs?.title) el.setAttribute('title', s.attrs.title);
         if (s.attrs?.autolink === 'true') el.setAttribute('data-autolink', '');
-    } else if (MARK_TAG[s.type]) {
-        el = d.createElement(MARK_TAG[s.type]);
-    } else {
-        el = d.createElement('span');
-        el.setAttribute(MARK_ATTR, s.type);
-        if (s.attrs && Object.keys(s.attrs).length) el.setAttribute(ATTRS_ATTR, JSON.stringify(s.attrs));
+        return el;
     }
+    const el = d.createElement(tag ?? 'span');
+    if (!tag) el.setAttribute(MARK_ATTR, s.type);
+    if (s.attrs && Object.keys(s.attrs).length) el.setAttribute(ATTRS_ATTR, JSON.stringify(s.attrs));
     return el;
 }
 
@@ -160,8 +185,9 @@ function makeAtom(span: InlineSpan, d: Document, opts: RenderOptions): HTMLEleme
 // Read back
 // ---------------------------------------------------------------------------
 
-/** Read the host's content back into a flat model. Tolerant: unknown elements are transparent, `<b>`/`<i>`/`<s>` are marks. */
+/** Read the host's content back into a flat model. Tolerant: unknown elements are transparent; the schema's mark tags and their aliases are marks. */
 export function readInline(host: HTMLElement, schema?: Schema): InlineFlat {
+    const tags = tagMap(schema);
     let text = '';
     const spans: InlineSpan[] = [];
     const walk = (node: Node, active: InlineSpan[]): void => {
@@ -192,16 +218,19 @@ export function readInline(host: HTMLElement, schema?: Schema): InlineFlat {
             return;
         }
         let next = active;
-        if (tag === 'a') {
+        const type = tags.get(tag);
+        if (type !== undefined && tag === 'a') {
             const url = el.getAttribute('data-url') ?? el.getAttribute('href') ?? '';
             const attrs: Record<string, string> = { url };
             const title = el.getAttribute('title');
             if (title) attrs.title = title;
             if (el.hasAttribute('data-autolink')) attrs.autolink = 'true';
-            next = [...active.filter((m) => m.type !== 'link'), { start: 0, end: 0, type: 'link', attrs }];
-        } else if (TAG_MARK[tag]) {
-            const type = TAG_MARK[tag];
-            if (!active.some((m) => m.type === type)) next = [...active, { start: 0, end: 0, type }];
+            next = [...active.filter((m) => m.type !== type), { start: 0, end: 0, type, attrs }];
+        } else if (type !== undefined) {
+            if (!active.some((m) => m.type === type)) {
+                const attrs = readAttrs(el);
+                next = [...active, { start: 0, end: 0, type, ...(Object.keys(attrs).length ? { attrs } : {}) }];
+            }
         } else {
             const markType = el.getAttribute(MARK_ATTR);
             if (markType !== null) {
