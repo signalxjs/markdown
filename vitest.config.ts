@@ -40,7 +40,6 @@ export default defineConfig({
             { find: '@sigx/richtext/editor', replacement: resolve(__dirname, 'packages/richtext/src/editor/index.ts') },
             { find: '@sigx/richtext/testing', replacement: resolve(__dirname, 'packages/richtext/src/testing/index.ts') },
             { find: '@sigx/richtext-markdown/editor', replacement: resolve(__dirname, 'packages/richtext-markdown/src/editor/index.ts') },
-            { find: '@sigx/richtext-markdown/testing', replacement: resolve(__dirname, 'packages/richtext-markdown/src/testing/index.ts') },
             { find: /^@sigx\/richtext-markdown$/, replacement: resolve(__dirname, 'packages/richtext-markdown/src/index.ts') },
             { find: '@sigx/richtext-html/editor', replacement: resolve(__dirname, 'packages/richtext-html/src/editor/index.ts') },
             { find: /^@sigx\/richtext-html$/, replacement: resolve(__dirname, 'packages/richtext-html/src/index.ts') },

@@ -191,8 +191,9 @@ through the workspace links), then `pnpm --filter <example-name> dev`.
   format. Entries: `.` (the CommonMark + GFM parser, `createIncrementalEngine`,
   `toMarkdown`, `markdownFormat`, `markdownNodes` / `markdownSchema`, the
   `MarkdownPluginSlice` contract plugins fill under `formats.markdown`,
-  `mentionPlugin`), `./editor` (`markdownPreset`) and `./testing` (`toHtml()`,
-  the spec-conformance renderer). Peers on `@sigx/richtext`.
+  `mentionPlugin`) and `./editor` (`markdownPreset`). Peers on `@sigx/richtext`.
+  Its CommonMark / GFM conformance suites render through
+  `@sigx/richtext-html`'s `toHtml` (one HTML writer in the repo).
 - `packages/richtext-html` → `@sigx/richtext-html` — HTML as a format.
   Entries: `.` (`parseHtml` — a hand-written tokenizer and tree with browser
   style structure repair, no `DOMParser` — `toHtml` with the CommonMark
@@ -210,8 +211,11 @@ Formats never import each other, and the core never imports a format.
 
 Path aliases: `tsconfig.json` and `vitest.config.ts` map every package (and
 its subpaths) to `packages/<name>/src`, so tests and typecheck run against
-source, not dist — a core test may import `@sigx/richtext-markdown` to build
-fixtures through the alias. A new entry is added to BOTH maps (subpaths before
+source, not dist — a test may import a sibling package through the alias (a
+core test builds fixtures with `@sigx/richtext-markdown`, the markdown
+conformance suite renders with `@sigx/richtext-html`) without a
+`devDependencies` edge, which would make the workspace graph cyclic. A new
+entry is added to BOTH maps (subpaths before
 the bare name — vitest matches aliases in order), to `exports` in
 `package.json` and `entry` in `vite.config.ts`, to `.size-limit.json`, and to
 `ENTRIES` in `scripts/verify-pack.js`. A new package is also added to
@@ -244,9 +248,8 @@ Source layout (`packages/richtext/src`):
 - **`packages/richtext-markdown/src`** mirrors the shape: `parser/`,
   `serializer/`, `plugin/` (the markdown slice contract and its resolver),
   `format.ts`, `nodes.ts`, `definitions.ts`, `mention.ts`, `editor/` (the
-  preset), `testing/` (`toHtml`). It imports the core through the package
-  entries (`@sigx/richtext`, `@sigx/richtext/editor`) only — never a core
-  file path.
+  preset). It imports the core through the package entries (`@sigx/richtext`,
+  `@sigx/richtext/editor`) only — never a core file path.
 - **Every entry point is a folder** — `src/index.ts` for `.`,
   `src/<entry>/index.ts` for a subpath — and those files are re-exports
   only, never implementation. `tsc` mirrors the tree, so a subpath's

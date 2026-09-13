@@ -25,6 +25,11 @@ workspace shares one version line.
 
 ### Changed
 
+- **One HTML writer** (#34, phase 7 of #19). `@sigx/richtext-markdown/testing`
+  is gone: its `toHtml()` was the CommonMark conformance renderer, and
+  `@sigx/richtext-html`'s `toHtml(tree, { sanitize: false })` is byte-identical
+  on the CommonMark and GFM fixtures — the conformance suites now render
+  through it (`known-failures.json` unchanged).
 - `pickPasteFormat` (and so `Editor.paste`) tries every format's specific
   flavours before `text/plain`: a markdown editor that also reads HTML parses
   a browser's `text/html` instead of the plain text it ships alongside.

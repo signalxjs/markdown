@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Root } from '@sigx/richtext';
 import { parseMarkdown } from '@sigx/richtext-markdown';
-import { toHtml as conformanceToHtml } from '@sigx/richtext-markdown/testing';
 import { toHtml } from '../src/serialize.js';
 
 describe('toHtml', () => {
     it('writes the CommonMark reference layout for the standard vocabulary', () => {
         const md = '# Hi\n\nSome **bold** _em_ ~~del~~ `code` [l](/u "T") ![a](/i.png)\nline  \nbreak\n\n- a\n- [x] b\n\n1. one\n\n   two\n\n> q\n\n```ts\nlet x\n```\n\n---\n\n| a | b |\n|:--|--:|\n| 1 | 2 |\n';
         const root = parseMarkdown(md);
-        expect(toHtml(root)).toBe(conformanceToHtml(root));
         expect(toHtml(root)).toBe(
             '<h1>Hi</h1>\n<p>Some <strong>bold</strong> <em>em</em> <del>del</del> <code>code</code> <a href="/u" title="T">l</a> <img src="/i.png" alt="a" />\nline<br />\nbreak</p>\n<ul>\n<li>a</li>\n<li><input checked="" disabled="" type="checkbox"> b</li>\n</ul>\n<ol>\n<li>\n<p>one</p>\n<p>two</p>\n</li>\n</ol>\n<blockquote>\n<p>q</p>\n</blockquote>\n<pre><code class="language-ts">let x\n</code></pre>\n<hr />\n<table>\n<thead>\n<tr>\n<th align="left">a</th>\n<th align="right">b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td align="left">1</td>\n<td align="right">2</td>\n</tr>\n</tbody>\n</table>\n',
         );

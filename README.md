@@ -26,7 +26,7 @@ Full guides, API reference and live examples → **<https://sigx.dev/richtext/>*
 | `@sigx/richtext/dom` | `RichTextView` for the web — default components styled through `data-scope` / `data-part` attributes, a `CodeBlock` chrome with copy button, the `CodeHighlighter` contract |
 | `@sigx/richtext/editor` | The block-tree editor core: state, commands, history, keymap, input rules, triggers and the surface contract a platform implements |
 | `@sigx/richtext/editor/dom` | `RichTextEditor` for the web — a Notion-class block editor: contenteditable surfaces per block, toolbar, block handles and menu, slash commands, mentions, two-way `source` / `document` models |
-| [`@sigx/richtext-markdown`](./packages/richtext-markdown) | Markdown as a format: the CommonMark + GFM parser, `markdownFormat`, `toMarkdown`, the markdown syntax-extension contract for plugins, `markdownPreset` (`./editor`) and the spec-conformance `toHtml()` (`./testing`) |
+| [`@sigx/richtext-markdown`](./packages/richtext-markdown) | Markdown as a format: the CommonMark + GFM parser, `markdownFormat`, `toMarkdown`, the markdown syntax-extension contract for plugins, `markdownPreset` (`./editor`) |
 | [`@sigx/richtext-html`](./packages/richtext-html) | HTML as a format: a platform-free parser for pasted and generated markup, a serializer with the CommonMark reference layout, `htmlFormat`, the HTML syntax-extension contract for plugins and `htmlPreset` (`./editor`, the `text/html` clipboard flavour) |
 | [`@sigx/richtext-shiki`](./packages/richtext-shiki) | Shiki highlighting as a plugin: `shikiPlugin()` / `createShikiHighlighter()` (the only package that imports `shiki`) |
 

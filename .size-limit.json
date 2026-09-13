@@ -89,19 +89,6 @@
     ]
   },
   {
-    "name": "@sigx/richtext-markdown/testing",
-    "path": "packages/richtext-markdown/dist/testing.prod.js",
-    "limit": "6 KB",
-    "ignore": [
-      "@sigx/richtext",
-      "@sigx/richtext-markdown",
-      "@sigx/reactivity",
-      "@sigx/runtime-core",
-      "@sigx/runtime-dom",
-      "shiki"
-    ]
-  },
-  {
     "name": "@sigx/richtext-shiki",
     "path": "packages/richtext-shiki/dist/index.prod.js",
     "limit": "6 KB",

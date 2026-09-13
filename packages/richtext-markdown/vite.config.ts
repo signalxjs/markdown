@@ -12,8 +12,7 @@ import type { ConfigEnv, UserConfig } from 'vite';
 const base = defineLibConfig({
     entry: {
         index: 'src/index.ts',
-        editor: 'src/editor/index.ts',
-        testing: 'src/testing/index.ts'
+        editor: 'src/editor/index.ts'
     },
     external: [/@sigx\/.*/, /^node:/],
     // Shipped components target the runtime directly, never the `sigx`

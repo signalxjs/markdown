@@ -43,7 +43,6 @@ const ENTRIES = [
     '@sigx/richtext/testing',
     '@sigx/richtext-markdown',
     '@sigx/richtext-markdown/editor',
-    '@sigx/richtext-markdown/testing',
     '@sigx/richtext-html',
     '@sigx/richtext-html/editor',
     '@sigx/richtext-shiki',

@@ -2,8 +2,7 @@
  * `@sigx/richtext/testing` — helpers for tests of the package and of
  * consumers: tree normalisation for structural comparison, the streaming
  * harness, fake surfaces and the surface conformance suite. Platform-free;
- * sits on top of every other folder and nothing imports from it. The
- * spec-conformance HTML renderer is `@sigx/richtext-markdown/testing`.
+ * sits on top of every other folder and nothing imports from it.
  */
 
 export { strip, stripPositions } from './strip.js';
