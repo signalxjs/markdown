@@ -14,7 +14,7 @@ describe('renderInline / readInline', () => {
         const flat = flatOf('a **b _c_** `d` [e](u "t") ~~f~~');
         renderInline(h, flat);
         expect(h.innerHTML).toBe('a <strong>b <em>c</em></strong> <code>d</code> <a href="u" data-url="u" title="t">e</a> <del>f</del>');
-        expect(flatEquals(readInline(h, markdownSchema), flat)).toBe(true);
+        expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
     });
 
     it('round-trips overlapping marks (close/reopen) and merges them back', () => {
@@ -22,7 +22,7 @@ describe('renderInline / readInline', () => {
         const flat: InlineFlat = { text: 'abcd', spans: [{ start: 0, end: 3, type: 'strong' }, { start: 1, end: 4, type: 'emphasis' }] };
         renderInline(h, flat);
         expect(h.innerHTML).toBe('<strong>a<em>bc</em></strong><em>d</em>');
-        expect(flatEquals(readInline(h, markdownSchema), flat)).toBe(true);
+        expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
     });
 
     it('renders atoms as non-editable chips carrying their attrs', () => {
@@ -33,11 +33,11 @@ describe('renderInline / readInline', () => {
         expect(chip.getAttribute('contenteditable')).toBe('false');
         expect(chip.textContent).toBe('@Andy');
         expect(JSON.parse(chip.getAttribute('data-attrs')!)).toEqual({ id: 'u1', label: 'Andy' });
-        expect(flatEquals(readInline(h, markdownSchema), flat)).toBe(true);
+        expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
         // A mark wrapping an atom survives too.
         const wrapped: InlineFlat = { text: `${ATOM_CHAR}x`, spans: [{ start: 0, end: 1, type: 'image', attrs: { url: 'u', alt: 'a' } }, { start: 0, end: 2, type: 'strong' }] };
         renderInline(h, wrapped);
-        expect(flatEquals(readInline(h, markdownSchema), wrapped)).toBe(true);
+        expect(flatEquals(readInline(h, markdownSchema), wrapped, markdownSchema)).toBe(true);
     });
 
     it('renders hard breaks as <br data-break> and an empty host with a filler <br>', () => {
@@ -66,7 +66,7 @@ describe('renderInline / readInline', () => {
         const flat: InlineFlat = { text: 'ab', spans: [{ start: 0, end: 1, type: 'highlight', attrs: { color: 'y' } }] };
         renderInline(h, flat);
         expect(h.innerHTML).toBe('<span data-mark="highlight" data-attrs="{&quot;color&quot;:&quot;y&quot;}">a</span>b');
-        expect(flatEquals(readInline(h, markdownSchema), flat)).toBe(true);
+        expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
     });
 
     it('keeps the autolink flag through the DOM', () => {
@@ -74,7 +74,7 @@ describe('renderInline / readInline', () => {
         const flat = flatOf('<https://x.com>');
         renderInline(h, flat);
         expect(h.querySelector('a')!.hasAttribute('data-autolink')).toBe(true);
-        expect(flatEquals(readInline(h, markdownSchema), flat)).toBe(true);
+        expect(flatEquals(readInline(h, markdownSchema), flat, markdownSchema)).toBe(true);
     });
 });
 
