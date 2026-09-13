@@ -31,6 +31,9 @@ export const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr'
 const CLOSES_P = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dialog', 'div', 'dl', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'main', 'menu', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul', 'li', 'dt', 'dd', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot']);
 
 const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+const P_ONLY = new Set(['p']);
+/** Where the search for an open `p` (or heading) stops: the nearest block container. */
+const P_BOUNDARY = new Set(['blockquote', 'li', 'td', 'th', 'div', 'section', 'article', 'body']);
 
 /** `name` → the open elements it closes first, searched from the top of the stack down to (not through) `boundary`. */
 const IMPLIED_END: Record<string, { closes: Set<string>; boundary: Set<string> }> = {
@@ -89,8 +92,8 @@ export function fromTokens(tokens: readonly HtmlToken[]): HtmlNode[] {
             continue;
         }
         // Open.
-        if (CLOSES_P.has(t.name)) impliedEnd(new Set(['p']), new Set(['blockquote', 'li', 'td', 'th', 'div', 'section', 'article', 'body']));
-        if (HEADINGS.has(t.name)) impliedEnd(HEADINGS, new Set(['blockquote', 'li', 'td', 'th', 'div', 'section', 'article', 'body']));
+        if (CLOSES_P.has(t.name)) impliedEnd(P_ONLY, P_BOUNDARY);
+        if (HEADINGS.has(t.name)) impliedEnd(HEADINGS, P_BOUNDARY);
         const implied = IMPLIED_END[t.name];
         if (implied) impliedEnd(implied.closes, implied.boundary);
         const el: HtmlElement = { type: 'element', tag: t.name, attrs: t.attrs, children: [] };

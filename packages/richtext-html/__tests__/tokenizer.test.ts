@@ -38,9 +38,19 @@ describe('tokenize', () => {
         ]);
     });
 
-    it('treats a bare < as text and drops an unterminated tag at the end', () => {
-        expect(tokenize('a < b <c')).toEqual([{ kind: 'text', value: 'a < b ' }]);
-        expect(tokenize('<p a="unterminated')).toEqual([]);
+    it('treats a bare < and any malformed tag as text, never dropping what follows', () => {
+        expect(tokenize('a < b <c')).toEqual([{ kind: 'text', value: 'a < b <c' }]);
+        expect(tokenize('<p a="unterminated')).toEqual([{ kind: 'text', value: '<p a="unterminated' }]);
+        expect(tokenize('<b class="x>bold</b> <i>tail</i>')).toEqual([
+            { kind: 'text', value: '<b class="x>bold' },
+            { kind: 'close', name: 'b' },
+            { kind: 'text', value: ' ' },
+            { kind: 'open', name: 'i', attrs: {}, selfClosing: false },
+            { kind: 'text', value: 'tail' },
+            { kind: 'close', name: 'i' },
+        ]);
+        expect(tokenize('x</p')).toEqual([{ kind: 'text', value: 'x</p' }]);
+        // A raw-text element that never closes swallows to the end, as in HTML.
         expect(tokenize('<script>never closed')).toEqual([{ kind: 'open', name: 'script', attrs: {}, selfClosing: false }]);
     });
 
