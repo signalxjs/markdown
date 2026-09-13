@@ -6,9 +6,9 @@
  * `math`, `select`, `textarea`, `title`, `head`, …) is swallowed whole.
  * Character references are decoded in text and attribute values with the
  * core's `decodeEntities` (the HTML5 named set). Platform-free: no
- * `DOMParser`, so it runs on Lynx and in the terminal alike. Never throws —
- * an unterminated tag at the end of the input is dropped, everything else
- * is text.
+ * `DOMParser`, so it runs on Lynx and in the terminal alike. Never throws and
+ * never drops content: a malformed tag (an unclosed quote, no `>` before the
+ * end) is text, like a bare `<`.
  */
 
 import { decodeEntities } from '@sigx/richtext';
@@ -58,17 +58,16 @@ export function tokenize(source: string): HtmlToken[] {
         }
         // End tag.
         if (next === '/' && i + 2 < n && NAME_START.test(source[i + 2])) {
-            flushText(i);
             let j = i + 2;
             while (j < n && NAME_CHAR.test(source[j])) j++;
             const name = source.slice(i + 2, j).toLowerCase();
             const gt = source.indexOf('>', j);
             if (gt === -1) {
-                // Unterminated at EOF: dropped.
-                i = n;
-                textStart = n;
-                break;
+                // No `>` before the end: text.
+                i++;
+                continue;
             }
+            flushText(i);
             i = gt + 1;
             textStart = i;
             if (name === 'br') out.push({ kind: 'open', name: 'br', attrs: {}, selfClosing: true });
@@ -79,11 +78,9 @@ export function tokenize(source: string): HtmlToken[] {
         if (next !== undefined && NAME_START.test(next)) {
             const tag = readStartTag(source, i);
             if (!tag) {
-                // Unterminated at EOF: dropped.
-                flushText(i);
-                i = n;
-                textStart = n;
-                break;
+                // Malformed (an unclosed quote, no `>` before the end): text.
+                i++;
+                continue;
             }
             flushText(i);
             out.push({ kind: 'open', name: tag.name, attrs: tag.attrs, selfClosing: tag.selfClosing });
