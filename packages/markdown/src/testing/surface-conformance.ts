@@ -9,7 +9,7 @@
  * ```
  */
 
-import { standardSchema } from '../schema/index.js';
+import { standardSchema, type Schema } from '../schema/index.js';
 import type { InlineFlat } from '../editor/inline-flat.js';
 import { flatEquals } from '../editor/inline-flat.js';
 import type { BoundaryKey, InlineSurface, InlineSurfaceEvents, InlineSurfaceInit, Range, SurfaceBoundaryEvent, SurfaceChangeEvent } from '../editor/surface.js';
@@ -34,6 +34,8 @@ export interface ConformanceHarness {
     expect: (value: unknown) => { toBe(expected: unknown): void; toEqual(expected: unknown): void; toBeGreaterThan(n: number): void };
     /** Tear down surfaces created by a test. */
     cleanup?(surface: InlineSurface): void;
+    /** The schema surfaces are created and compared with. Default: the standard schema. */
+    schema?: Schema;
 }
 
 interface Recorded {
@@ -85,7 +87,7 @@ export function runInlineSurfaceConformance(h: ConformanceHarness): void {
     /** Create a surface for `flat`, run `body` against it, and always tear it down — on early return, a failed expectation or a throw alike. */
     const using = async (flat: InlineFlat, body: (surface: InlineSurface, log: Recorded) => Promise<void>, consume = true): Promise<void> => {
         const r = recorder(consume);
-        const surface = h.create({ key: 'b-0', blockType: 'paragraph', schema: standardSchema, attrs: {}, flat, readOnly: false, events: r.events });
+        const surface = h.create({ key: 'b-0', blockType: 'paragraph', schema: h.schema ?? standardSchema, attrs: {}, flat, readOnly: false, events: r.events });
         try {
             await body(surface, r.log);
         } finally {
@@ -98,7 +100,7 @@ export function runInlineSurfaceConformance(h: ConformanceHarness): void {
         const flat: InlineFlat = { text: 'a b c', spans: [{ start: 2, end: 3, type: 'strong' }, { start: 4, end: 5, type: 'link', attrs: { url: 'u' } }] };
         await using(flat, async (surface) => {
             await settle();
-            expect(flatEquals(surface.getFlat(), flat)).toBe(true);
+            expect(flatEquals(surface.getFlat(), flat, h.schema ?? standardSchema)).toBe(true);
         });
     });
 
@@ -119,7 +121,7 @@ export function runInlineSurfaceConformance(h: ConformanceHarness): void {
             const next: InlineFlat = { text: 'new *x*', spans: [{ start: 4, end: 7, type: 'emphasis' }] };
             surface.setInline(next);
             await settle();
-            expect(flatEquals(surface.getFlat(), next)).toBe(true);
+            expect(flatEquals(surface.getFlat(), next, h.schema ?? standardSchema)).toBe(true);
             expect(log.changes.length).toBe(0);
         });
     });
@@ -133,7 +135,7 @@ export function runInlineSurfaceConformance(h: ConformanceHarness): void {
             expect(log.changes.length).toBeGreaterThan(0);
             const last = log.changes[log.changes.length - 1];
             expect(last.flat.text).toBe('aXb');
-            expect(flatEquals(last.flat, surface.getFlat())).toBe(true);
+            expect(flatEquals(last.flat, surface.getFlat(), h.schema ?? standardSchema)).toBe(true);
             expect(last.composing).toBe(false);
         });
     });
