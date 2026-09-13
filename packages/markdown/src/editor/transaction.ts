@@ -5,7 +5,7 @@
 
 import type { Root } from '../ast/index.js';
 import type { Schema } from '../schema/index.js';
-import type { EditorSelection, EditorState } from './state.js';
+import type { BlockIndex, EditorSelection, EditorState } from './state.js';
 import { buildIndex, makeState } from './state.js';
 import type { Step, StepContext } from './steps.js';
 import { applyStep, invertStep } from './steps.js';
@@ -70,6 +70,9 @@ export function applyTransaction(state: EditorState, tr: Transaction, ctx: StepC
  */
 export function mapSelection(sel: EditorSelection, steps: Step[], doc: Root, schema: Schema): EditorSelection {
     if (!sel) return null;
+    // The post-step index, built once on first need and shared by every structural step.
+    let index: BlockIndex | null = null;
+    const existsIn = (key: string): boolean => (index ??= buildIndex(doc, schema)).get(key) !== undefined;
     let cur: EditorSelection = sel;
     for (const step of steps) {
         if (!cur) return null;
@@ -100,18 +103,14 @@ export function mapSelection(sel: EditorSelection, steps: Step[], doc: Root, sch
                 case 'moveBlock':
                 case 'replaceDoc':
                     // Structural: keep only if the block still exists (keys may have shifted, so verify).
-                    cur = existsIn(doc, key, schema) ? cur : null;
+                    cur = existsIn(key) ? cur : null;
                     break;
                 default:
                     break;
             }
         } else if (step.type !== 'replaceInline' && step.type !== 'setInline' && step.type !== 'setValue' && step.type !== 'setAttrs') {
-            cur = existsIn(doc, cur.anchorKey, schema) && existsIn(doc, cur.headKey, schema) ? cur : null;
+            cur = existsIn(cur.anchorKey) && existsIn(cur.headKey) ? cur : null;
         }
     }
     return cur;
-}
-
-function existsIn(doc: Root, key: string, schema: Schema): boolean {
-    return buildIndex(doc, schema).get(key) !== undefined;
 }
