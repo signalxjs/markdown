@@ -1,27 +1,27 @@
 {
-  "name": "playground-example",
-  "private": true,
-  "type": "module",
-  "description": "@sigx/richtext in a real SignalX app — a source pane, the DOM view with Shiki / mention / class-prefix / dark toggles, token-by-token streaming through createTextStream, the serializer output and the editor",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 4173 --strictPort",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "e2e": "playwright test"
-  },
-  "dependencies": {
-    "@sigx/richtext": "workspace:*",
-    "@sigx/richtext-html": "workspace:*",
-    "@sigx/richtext-markdown": "workspace:*",
-    "@sigx/richtext-shiki": "workspace:*",
-    "shiki": "^4.0.2",
-    "sigx": "catalog:"
-  },
-  "devDependencies": {
-    "@sigx/vite": "catalog:",
-    "@types/node": "^25.9.1",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.3"
-  }
+    "name": "playground-example",
+    "private": true,
+    "type": "module",
+    "description": "@sigx/richtext in a real SignalX app — a source pane, the DOM view with Shiki / mention / class-prefix / dark toggles, token-by-token streaming through createTextStream, the serializer output and the editor",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview --port 4173 --strictPort",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "e2e": "playwright test"
+    },
+    "dependencies": {
+        "@sigx/richtext": "workspace:*",
+        "@sigx/richtext-html": "workspace:*",
+        "@sigx/richtext-markdown": "workspace:*",
+        "@sigx/richtext-shiki": "workspace:*",
+        "shiki": "^4.0.2",
+        "sigx": "catalog:"
+    },
+    "devDependencies": {
+        "@sigx/vite": "catalog:",
+        "@types/node": "^25.9.1",
+        "typescript": "^6.0.3",
+        "vite": "^8.0.3"
+    }
 }

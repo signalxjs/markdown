@@ -6,9 +6,10 @@
  * `math`, `select`, `textarea`, `title`, `head`, …) is swallowed whole.
  * Character references are decoded in text and attribute values with the
  * core's `decodeEntities` (the HTML5 named set). Platform-free: no
- * `DOMParser`, so it runs on Lynx and in the terminal alike. Never throws and
- * never drops content: a malformed tag (an unclosed quote, no `>` before the
- * end) is text, like a bare `<`.
+ * `DOMParser`, so it runs on Lynx and in the terminal alike. Never throws. A
+ * malformed tag (an unclosed quote, no `>` before the end) is text, like a
+ * bare `<`; only the swallowed elements lose content, and one that never
+ * closes swallows to the end of the input, as in HTML.
  */
 
 import { decodeEntities } from '@sigx/richtext';
