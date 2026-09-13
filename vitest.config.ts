@@ -32,14 +32,18 @@ export default defineConfig({
     },
     resolve: {
         // Subpaths before the bare name: vitest matches aliases in order and a
-        // bare `@sigx/markdown` entry first would swallow `@sigx/markdown/dom`.
+        // bare `@sigx/richtext` entry first would swallow `@sigx/richtext/dom`
+        // (and `@sigx/richtext-markdown`, hence the anchored regexes).
         alias: [
-            { find: '@sigx/markdown/dom', replacement: resolve(__dirname, 'packages/markdown/src/dom/index.ts') },
-            { find: '@sigx/markdown/shiki', replacement: resolve(__dirname, 'packages/markdown/src/shiki/index.ts') },
-            { find: '@sigx/markdown/editor/dom', replacement: resolve(__dirname, 'packages/markdown/src/editor/dom/index.ts') },
-            { find: '@sigx/markdown/editor', replacement: resolve(__dirname, 'packages/markdown/src/editor/index.ts') },
-            { find: '@sigx/markdown/testing', replacement: resolve(__dirname, 'packages/markdown/src/testing/index.ts') },
-            { find: /^@sigx\/markdown$/, replacement: resolve(__dirname, 'packages/markdown/src/index.ts') }
+            { find: '@sigx/richtext/dom', replacement: resolve(__dirname, 'packages/richtext/src/dom/index.ts') },
+            { find: '@sigx/richtext/editor/dom', replacement: resolve(__dirname, 'packages/richtext/src/editor/dom/index.ts') },
+            { find: '@sigx/richtext/editor', replacement: resolve(__dirname, 'packages/richtext/src/editor/index.ts') },
+            { find: '@sigx/richtext/testing', replacement: resolve(__dirname, 'packages/richtext/src/testing/index.ts') },
+            { find: '@sigx/richtext-markdown/editor', replacement: resolve(__dirname, 'packages/richtext-markdown/src/editor/index.ts') },
+            { find: '@sigx/richtext-markdown/testing', replacement: resolve(__dirname, 'packages/richtext-markdown/src/testing/index.ts') },
+            { find: /^@sigx\/richtext-markdown$/, replacement: resolve(__dirname, 'packages/richtext-markdown/src/index.ts') },
+            { find: /^@sigx\/richtext-shiki$/, replacement: resolve(__dirname, 'packages/richtext-shiki/src/index.ts') },
+            { find: /^@sigx\/richtext$/, replacement: resolve(__dirname, 'packages/richtext/src/index.ts') }
         ]
     }
 });

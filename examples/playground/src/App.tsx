@@ -5,26 +5,17 @@
  * only the block a keystroke touches.
  */
 import { component, computed, type JSXElement } from 'sigx';
-import {
-    createTextStream,
-    markdownFormat,
-    mentionPlugin,
-    parseMarkdown,
-    toJSON,
-    toMarkdown,
-    type RenderChild,
-    type RichTextPlugin,
-    type Mention,
-    type NodeProps
-} from '@sigx/markdown';
-import { RichTextView, highlightedCodeBlock, type DomComponents } from '@sigx/markdown/dom';
-import { createSlashPlugin, markdownPreset } from '@sigx/markdown/editor';
-import { RichTextEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
+import { createTextStream, toJSON, type RenderChild, type RichTextPlugin, type Mention, type NodeProps } from '@sigx/richtext';
+import { RichTextView, highlightedCodeBlock, type DomComponents } from '@sigx/richtext/dom';
+import { createSlashPlugin } from '@sigx/richtext/editor';
+import { RichTextEditor, createDomMentionPlugin } from '@sigx/richtext/editor/dom';
+import { markdownFormat, mentionMarkdown, mentionPlugin, parseMarkdown, toMarkdown } from '@sigx/richtext-markdown';
+import { markdownPreset } from '@sigx/richtext-markdown/editor';
 
 // Register the mention node with the AST and type its component slot: this
 // is the consumer-side half of the plugin contract (the package does not do
 // it itself so a plain tree stays exactly mdast).
-declare module '@sigx/markdown' {
+declare module '@sigx/richtext' {
     interface PhrasingContentMap {
         mention: Mention;
     }
@@ -33,7 +24,7 @@ declare module '@sigx/markdown' {
     }
 }
 
-const SAMPLE = `# @sigx/markdown playground
+const SAMPLE = `# @sigx/richtext playground
 
 Markdown for **SignalX** — an *incremental* parser that keeps finalized blocks
 stable while the source grows, a serializer, and a DOM view styled through
@@ -100,7 +91,8 @@ const PEOPLE = [
 const EDITOR_PLUGINS: readonly RichTextPlugin[] = [
     markdownPreset,
     createDomMentionPlugin({
-        onQuery: (q) => PEOPLE.filter((p) => p.label.toLowerCase().startsWith(q.toLowerCase()))
+        onQuery: (q) => PEOPLE.filter((p) => p.label.toLowerCase().startsWith(q.toLowerCase())),
+        formats: { markdown: mentionMarkdown }
     }),
     createSlashPlugin()
 ];
@@ -134,7 +126,7 @@ export const App = component(({ signal, onUnmounted }) => {
     let shikiLoading: Promise<void> | null = null;
 
     const loadShiki = (): Promise<void> => {
-        shikiLoading ??= import('@sigx/markdown/shiki').then(({ createShikiHighlighter }) => {
+        shikiLoading ??= import('@sigx/richtext-shiki').then(({ createShikiHighlighter }) => {
             shikiCode = highlightedCodeBlock(createShikiHighlighter());
             state.shikiReady = true;
         });
@@ -211,7 +203,7 @@ export const App = component(({ signal, onUnmounted }) => {
     return () => (
         <div class="app">
             <header class="toolbar">
-                <h1>@sigx/markdown</h1>
+                <h1>@sigx/richtext</h1>
                 <label>
                     <input type="checkbox" data-testid="toggle-shiki" checked={state.shiki} onChange={toggleShiki} />
                     Shiki

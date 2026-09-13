@@ -1,8 +1,8 @@
 {
-  "name": "sigx-markdown-monorepo",
+  "name": "sigx-richtext-monorepo",
   "version": "0.2.0",
   "private": true,
-  "description": "Markdown for SignalX — an mdast-compatible incremental parser, serializer, streaming, a renderer-neutral engine with a DOM view, and a block-tree editor for web and Lynx",
+  "description": "Rich text for SignalX — a schema-driven mdast-shaped document model with pluggable formats (markdown, HTML), an incremental streaming engine, a renderer-neutral engine with a DOM view, and a block-tree editor for web and Lynx",
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -13,13 +13,13 @@
     "branch-protection": "node scripts/apply-branch-protection.mjs",
     "sync:core": "node scripts/sync-core.mjs",
     "verify:catalog": "node scripts/check-catalog.mjs",
-    "build": "pnpm --filter @sigx/markdown build",
+    "build": "pnpm -r --filter \"./packages/**\" build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsgo --noEmit && pnpm --filter playground-example typecheck",
-    "lint": "oxlint packages/markdown/src packages/markdown/__tests__ examples/playground/src",
-    "lint:fix": "oxlint --fix packages/markdown/src packages/markdown/__tests__ examples/playground/src",
+    "lint": "oxlint packages/*/src packages/*/__tests__ examples/playground/src",
+    "lint:fix": "oxlint --fix packages/*/src packages/*/__tests__ examples/playground/src",
     "clean": "rm -rf packages/*/dist packages/*/node_modules examples/*/dist examples/*/node_modules node_modules",
     "publish:dry": "node scripts/publish.js --dry-run",
     "publish:all": "node scripts/publish.js",
@@ -48,6 +48,7 @@
   "keywords": [
     "SignalX",
     "sigx",
+    "richtext",
     "markdown",
     "mdast",
     "commonmark",
@@ -60,11 +61,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/signalxjs/markdown.git"
+    "url": "git+https://github.com/signalxjs/richtext.git"
   },
-  "homepage": "https://sigx.dev/markdown/",
+  "homepage": "https://sigx.dev/richtext/",
   "bugs": {
-    "url": "https://github.com/signalxjs/markdown/issues"
+    "url": "https://github.com/signalxjs/richtext/issues"
   },
   "packageManager": "pnpm@10.33.4",
   "engines": {

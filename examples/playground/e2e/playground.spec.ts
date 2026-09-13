@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
 
 test('renders the sample document', async ({ page }) => {
     const view = page.locator('#static');
-    await expect(view.locator('[data-part="heading"][data-depth="1"]')).toHaveText('@sigx/markdown playground');
+    await expect(view.locator('[data-part="heading"][data-depth="1"]')).toHaveText('@sigx/richtext playground');
     await expect(view.locator('[data-part="table"]')).toHaveCount(1);
     await expect(view.locator('[data-part="code"][data-lang="ts"]')).toHaveCount(1);
     // The mention plugin is on by default: `@[Andy](u1)` renders through the app's slot.

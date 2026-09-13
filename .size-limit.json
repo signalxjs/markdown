@@ -1,30 +1,10 @@
 [
   {
-    "name": "@sigx/markdown",
-    "path": "packages/markdown/dist/index.prod.js",
-    "limit": "20 KB",
+    "name": "@sigx/richtext",
+    "path": "packages/richtext/dist/index.prod.js",
+    "limit": "12 KB",
     "ignore": [
-      "@sigx/reactivity",
-      "@sigx/runtime-core"
-    ]
-  },
-  {
-    "name": "@sigx/markdown/dom",
-    "path": "packages/markdown/dist/dom.prod.js",
-    "limit": "18 KB",
-    "ignore": [
-      "@sigx/markdown",
-      "@sigx/reactivity",
-      "@sigx/runtime-core",
-      "@sigx/runtime-dom"
-    ]
-  },
-  {
-    "name": "@sigx/markdown/shiki",
-    "path": "packages/markdown/dist/shiki.prod.js",
-    "limit": "18 KB",
-    "ignore": [
-      "@sigx/markdown",
+      "@sigx/richtext-markdown",
       "@sigx/reactivity",
       "@sigx/runtime-core",
       "@sigx/runtime-dom",
@@ -32,34 +12,106 @@
     ]
   },
   {
-    "name": "@sigx/markdown/editor",
-    "path": "packages/markdown/dist/editor.prod.js",
-    "limit": "30 KB",
-    "ignore": [
-      "@sigx/markdown",
-      "@sigx/reactivity",
-      "@sigx/runtime-core"
-    ]
-  },
-  {
-    "name": "@sigx/markdown/editor/dom",
-    "path": "packages/markdown/dist/editor/dom.prod.js",
-    "limit": "36 KB",
-    "ignore": [
-      "@sigx/markdown",
-      "@sigx/reactivity",
-      "@sigx/runtime-core",
-      "@sigx/runtime-dom"
-    ]
-  },
-  {
-    "name": "@sigx/markdown/testing",
-    "path": "packages/markdown/dist/testing.prod.js",
+    "name": "@sigx/richtext/dom",
+    "path": "packages/richtext/dist/dom.prod.js",
     "limit": "8 KB",
     "ignore": [
-      "@sigx/markdown",
+      "@sigx/richtext",
+      "@sigx/richtext-markdown",
       "@sigx/reactivity",
-      "@sigx/runtime-core"
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
+    "name": "@sigx/richtext/editor",
+    "path": "packages/richtext/dist/editor.prod.js",
+    "limit": "24 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/richtext-markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
+    "name": "@sigx/richtext/editor/dom",
+    "path": "packages/richtext/dist/editor/dom.prod.js",
+    "limit": "36 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/richtext-markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
+    "name": "@sigx/richtext/testing",
+    "path": "packages/richtext/dist/testing.prod.js",
+    "limit": "8 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/richtext-markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
+    "name": "@sigx/richtext-markdown",
+    "path": "packages/richtext-markdown/dist/index.prod.js",
+    "limit": "16 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
+    "name": "@sigx/richtext-markdown/editor",
+    "path": "packages/richtext-markdown/dist/editor.prod.js",
+    "limit": "6 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/richtext-markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
+    "name": "@sigx/richtext-markdown/testing",
+    "path": "packages/richtext-markdown/dist/testing.prod.js",
+    "limit": "6 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/richtext-markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
+    ]
+  },
+  {
+    "name": "@sigx/richtext-shiki",
+    "path": "packages/richtext-shiki/dist/index.prod.js",
+    "limit": "6 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/richtext-markdown",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom",
+      "shiki"
     ]
   }
 ]

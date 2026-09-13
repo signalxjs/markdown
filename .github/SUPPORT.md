@@ -5,7 +5,7 @@ Thanks for using this SignalX project! Here's how to get help.
 ## Questions and discussions
 
 For usage questions, ideas, and general discussion, please use
-[GitHub Discussions](https://github.com/signalxjs/markdown/discussions). It keeps
+[GitHub Discussions](https://github.com/signalxjs/richtext/discussions). It keeps
 conversations searchable for everyone and is the fastest way to get a response.
 
 ## Bug reports and feature requests
@@ -13,13 +13,13 @@ conversations searchable for everyone and is the fastest way to get a response.
 If you've hit a reproducible bug or want to propose a new feature, open an
 issue with the relevant template:
 
-- [Report a bug](https://github.com/signalxjs/markdown/issues/new?template=bug_report.yml)
-- [Request a feature](https://github.com/signalxjs/markdown/issues/new?template=feature_request.yml)
+- [Report a bug](https://github.com/signalxjs/richtext/issues/new?template=bug_report.yml)
+- [Request a feature](https://github.com/signalxjs/richtext/issues/new?template=feature_request.yml)
 
 Before filing, please:
 
-- Check existing [issues](https://github.com/signalxjs/markdown/issues?q=is%3Aissue) and
-  [discussions](https://github.com/signalxjs/markdown/discussions) to avoid duplicates.
+- Check existing [issues](https://github.com/signalxjs/richtext/issues?q=is%3Aissue) and
+  [discussions](https://github.com/signalxjs/richtext/discussions) to avoid duplicates.
 - Include the affected package(s) and version, a minimal reproduction, and what
   you expected versus what happened.
 

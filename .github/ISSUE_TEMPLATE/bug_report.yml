@@ -23,11 +23,12 @@ body:
       label: Affected package(s)
       multiple: true
       options:
-        - "@sigx/markdown"
-        - "@sigx/markdown/dom"
-        - "@sigx/markdown/shiki"
-        - "@sigx/markdown/editor"
-        - "@sigx/markdown/editor/dom"
+        - "@sigx/richtext"
+        - "@sigx/richtext/dom"
+        - "@sigx/richtext/editor"
+        - "@sigx/richtext/editor/dom"
+        - "@sigx/richtext-markdown"
+        - "@sigx/richtext-shiki"
         - Not sure / multiple
     validations:
       required: true

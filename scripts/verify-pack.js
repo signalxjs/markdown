@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * signalxjs/markdown - Pre-publish pack smoke test
+ * signalxjs/richtext - Pre-publish pack smoke test
  *
  * Catches packaging bugs that lint/typecheck/test miss:
  *   - missing files in `files` array
@@ -32,19 +32,22 @@ import { tmpdir } from 'os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 
-const PACKAGES = ['packages/markdown'];
+const PACKAGES = ['packages/richtext', 'packages/richtext-markdown', 'packages/richtext-shiki'];
 
 /** Every runtime entry the tarballs expose, imported one by one. */
 const ENTRIES = [
-    '@sigx/markdown',
-    '@sigx/markdown/dom',
-    '@sigx/markdown/shiki',
-    '@sigx/markdown/editor',
-    '@sigx/markdown/editor/dom',
-    '@sigx/markdown/testing',
+    '@sigx/richtext',
+    '@sigx/richtext/dom',
+    '@sigx/richtext/editor',
+    '@sigx/richtext/editor/dom',
+    '@sigx/richtext/testing',
+    '@sigx/richtext-markdown',
+    '@sigx/richtext-markdown/editor',
+    '@sigx/richtext-markdown/testing',
+    '@sigx/richtext-shiki',
 ];
 
-const sandbox = join(tmpdir(), `sigx-markdown-verify-pack-${Date.now()}`);
+const sandbox = join(tmpdir(), `sigx-richtext-verify-pack-${Date.now()}`);
 const tarballDir = join(sandbox, 'tarballs');
 const appDir = join(sandbox, 'app');
 
@@ -108,16 +111,20 @@ function main() {
         packed.map((p) => [p.name, `file:${p.tarball.replace(/\\/g, '/')}`])
     );
     const appPkg = {
-        name: 'sigx-markdown-pack-smoke',
+        name: 'sigx-richtext-pack-smoke',
         version: '0.0.0',
         private: true,
         type: 'module',
         scripts: { smoke: 'node smoke.mjs' },
         // Only the REQUIRED peers: the scratch app owns the sigx runtime copy,
-        // exactly as a consuming app does. The optional peers (@sigx/runtime-dom,
-        // shiki) are deliberately absent so the smoke test fails if an entry ever
-        // imports one of them eagerly.
+        // exactly as a consuming app does. The optional peer @sigx/runtime-dom is
+        // deliberately absent so the smoke test fails if a core entry ever
+        // imports it eagerly; the shiki package peers on it and on `shiki`
+        // (imported lazily), so its install is satisfied by the overrides below.
         dependencies: { ...deps, '@sigx/reactivity': '^0.15.0', '@sigx/runtime-core': '^0.15.0' },
+        // The tarballs peer on each other at the published range; point those
+        // ranges at the tarballs so npm resolves the sibling from disk, not the registry.
+        overrides: { ...deps },
     };
     writeFileSync(join(appDir, 'package.json'), JSON.stringify(appPkg, null, 2));
 
@@ -136,7 +143,7 @@ function main() {
     );
 
     step('Install scratch app (npm — to avoid pnpm workspace hoisting interference)');
-    run('npm install --no-audit --no-fund --loglevel=error', { cwd: appDir });
+    run('npm install --no-audit --no-fund --legacy-peer-deps --loglevel=error', { cwd: appDir });
 
     step('Run import smoke (dev condition)');
     run('npm run smoke --silent', { cwd: appDir });

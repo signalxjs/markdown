@@ -7,7 +7,7 @@
 Use one of the following private channels:
 
 1. **GitHub Security Advisories** — preferred. Open a private report at
-   <https://github.com/signalxjs/markdown/security/advisories/new>.
+   <https://github.com/signalxjs/richtext/security/advisories/new>.
 2. **Email** — contact the maintainer directly: **Andreas Ekdahl**
    <andy@ekdahls.net>.
 
@@ -27,4 +27,4 @@ Please include:
 
 ## Supported versions
 
-Security fixes are applied to the latest released `0.x` minor line of `@sigx/markdown`.
+Security fixes are applied to the latest released `0.x` minor line of the `@sigx/richtext` packages.

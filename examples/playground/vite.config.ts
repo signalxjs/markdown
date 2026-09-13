@@ -1,8 +1,8 @@
 /**
  * A plain client-side SignalX app. `sigx()` keeps `@sigx/reactivity` a single
  * module instance (it aliases every installed `@sigx/*` package and its
- * `exports` subpaths to one built copy — `@sigx/markdown` resolves to
- * `packages/markdown/dist`, so run `pnpm build` at the repo root first).
+ * `exports` subpaths to one built copy — `@sigx/richtext` resolves to
+ * `packages/richtext/dist`, so run `pnpm build` at the repo root first).
  */
 import { defineConfig } from 'vite';
 import sigx from '@sigx/vite';
