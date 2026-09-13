@@ -5,8 +5,8 @@
  * editor by `runKeymap`.
  */
 
-import type { Command, CommandContext, CommandName, Dispatch } from './commands.js';
-import { commands } from './commands.js';
+import type { Command, CommandContext, Dispatch } from './commands.js';
+import { commands, type CommandName } from './registry.js';
 import type { KeyName } from './keys.js';
 import { normalizeKeyName } from './keys.js';
 import type { EditorState } from './state.js';

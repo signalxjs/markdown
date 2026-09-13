@@ -48,7 +48,7 @@ function events(over: Partial<InlineSurfaceEvents> = {}): InlineSurfaceEvents & 
             return name === 'Mod-b';
         },
         paste: (e) => {
-            log.push(`paste:${e.text}:${e.markdown ?? ''}`);
+            log.push(`paste:${e.data.text}:${e.data['text/markdown'] ?? ''}`);
             return true;
         },
         focus: () => {
@@ -197,7 +197,7 @@ describe('DomInlineSurface', () => {
     it('hands paste to the core with plain text and markdown flavours', () => {
         const { surface, ev } = make({ text: 'ab', spans: [] });
         surface.focus({ offset: 1 });
-        const data = { getData: (t: string) => (t === 'text/plain' ? 'hi' : t === 'text/markdown' ? '# hi' : '') };
+        const data = { types: ['text/plain', 'text/markdown'], getData: (t: string) => (t === 'text/plain' ? 'hi' : t === 'text/markdown' ? '# hi' : '') };
         const e = new Event('paste', { bubbles: true, cancelable: true });
         Object.defineProperty(e, 'clipboardData', { value: data });
         expect(surface.host.dispatchEvent(e)).toBe(false);

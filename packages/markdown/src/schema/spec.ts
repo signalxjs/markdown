@@ -114,6 +114,12 @@ export interface NodeSpec<N extends Node = Node> {
     editable?: boolean;
     /** Containers: the block type an empty one is filled with so a caret has somewhere to live (list item and blockquote → paragraph). */
     fillsWith?: string;
+    /** Caret edits never cross this block's boundary: it neither splits nor joins with its neighbours, and blocks are inserted after its outermost isolating ancestor (a table and its rows and cells). */
+    isolating?: boolean;
+    /** A container removed along with its last child (list item, list, blockquote). */
+    collapsesWhenEmpty?: boolean;
+    /** Moving this container's only child moves the container (a list item). */
+    moveAsUnit?: boolean;
     /** Text blocks: may hold hard breaks (paragraph yes, heading and table cell no). */
     allowsHardBreak?: boolean;
     /** Enter at the end of this block creates a block of this type after it (heading → paragraph). */

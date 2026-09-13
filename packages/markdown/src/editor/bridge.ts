@@ -18,6 +18,7 @@
 import type { InlineFlat } from './inline-flat.js';
 import type { Schema } from '../schema/index.js';
 import { flatEquals } from './inline-flat.js';
+import type { PasteData } from './paste.js';
 import type { EditorSelection, TextSelection } from './state.js';
 import { textSelection } from './state.js';
 import type { Step } from './steps.js';
@@ -33,8 +34,8 @@ export interface BridgeHost {
     runKey(name: string): boolean;
     /** Update the selection without a document change. */
     setSelection(selection: EditorSelection): void;
-    /** Paste handling (markdown-aware). Returns whether it was handled. */
-    paste(text: string, markdown?: string): boolean;
+    /** Paste handling: the editor picks the format that reads a flavour present. Returns whether it was handled. */
+    paste(data: PasteData): boolean;
     /** Current flat content of a block (for diffing whole-content changes). */
     flatOf(key: string): InlineFlat | null;
     /** Current value of a code block. */
@@ -125,7 +126,7 @@ export function createInlineBridge(key: string, host: BridgeHost): InlineBridge 
         },
         paste: (e) => {
             host.setSelection(sel(e.range, lengthOf()));
-            return host.paste(e.text, e.markdown);
+            return host.paste(e.data);
         },
         focus: () => host.focused(key),
         blur: () => host.focused(null),

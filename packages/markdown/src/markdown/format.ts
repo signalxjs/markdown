@@ -15,7 +15,8 @@ export type MarkdownFormatOptions = Omit<ToMarkdownOptions, 'plugins'>;
 
 export const markdownFormat: DocumentFormat<MarkdownFormatOptions> = {
     id: 'markdown',
-    mime: ['text/markdown', 'text/x-markdown'],
+    // `text/plain` last: plain text pasted into a markdown editor is markdown.
+    mime: ['text/markdown', 'text/x-markdown', 'text/plain'],
     nodes: markdownNodes,
     parse: (source, options) => parseMarkdown(source, { plugins: options?.plugins }),
     serialize: (node, options) => toMarkdown(node, options),

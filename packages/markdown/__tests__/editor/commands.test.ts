@@ -10,11 +10,13 @@ const doc = (...children: BlockContent[]): Root => ({ type: 'root', children });
 const p = (text = ''): BlockContent => ({ type: 'paragraph', children: text ? [{ type: 'text', value: text }] : [] });
 import { applyTransaction } from '../../src/editor/transaction.js';
 import type { Transaction } from '../../src/editor/transaction.js';
-import * as C from '../../src/editor/commands.js';
+import * as C from '../../src/editor/registry.js';
 import type { Command, CommandContext } from '../../src/editor/commands.js';
+import { markdownFormat } from '../../src/markdown/index.js';
+import { plainTextFormat } from '../../src/document/index.js';
 
 const schema = markdownSchema;
-const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
+const ctx: CommandContext = { schema, formats: [markdownFormat] };
 
 /** Run a command against a document (markdown or a hand-built root) + selection; returns the resulting markdown, state and transaction. */
 function run(md: string | Root, selection: EditorSelection, command: Command) {
@@ -321,8 +323,9 @@ describe('selection and document commands', () => {
         expect(run('- ab\n\ncd', null, C.focusEnd).state.selection).toEqual(at('b-1', 2));
     });
 
-    it('setDocument, setMarkdown and clear', () => {
-        const r = run('old', at('b-0', 1), C.setMarkdown('# new\n\ntext'));
+    it('setDocument, setSource and clear', () => {
+        const r = run('old', at('b-0', 1), C.setSource('# new\n\ntext'));
+        expect(run('old', at('b-0', 1), C.setSource('x', 'nope')).ok).toBe(false);
         expect(r.md).toBe('# new\n\ntext\n');
         expect(r.state.selection).toEqual(at('b-0', 0));
         expect(r.tr!.meta.addToHistory).toBe(false);
@@ -348,35 +351,72 @@ describe('setBlockType selection', () => {
 
 describe('paste', () => {
     it('pastes a single line inline with its marks', () => {
-        const r = run('ab', at('b-0', 1), C.pasteText('**x**'));
+        const r = run('ab', at('b-0', 1), C.paste({ text: '**x**' }));
         expect(r.md).toBe('a**x**b\n');
         expect(r.state.selection).toEqual(at('b-0', 2));
         expect(r.tr!.meta.origin).toBe('paste');
     });
 
     it('pastes multi-block markdown by splitting the paragraph and merging the edges', () => {
-        const r = run('ab', at('b-0', 1), C.pasteText('one\n\n- two\n\nthree'));
+        const r = run('ab', at('b-0', 1), C.paste({ text: 'one\n\n- two\n\nthree' }));
         expect(r.md).toBe('aone\n\n- two\n\nthreeb\n');
         expect(r.state.selection).toEqual(at('b-2', 5));
-        const endsWithBlock = run('ab', at('b-0', 1), C.pasteText('one\n\n```\ncode\n```'));
+        const endsWithBlock = run('ab', at('b-0', 1), C.paste({ text: 'one\n\n```\ncode\n```' }));
         expect(endsWithBlock.md).toBe('aone\n\n```\ncode\n```\n\nb\n');
         expect(endsWithBlock.state.selection).toEqual(at('b-2', 0));
     });
 
     it('pastes only paragraphs into the edges; a heading or list stays its own block', () => {
-        const r = run('ab', at('b-0', 2), C.pasteText('## H\n\n- x\n- y'));
+        const r = run('ab', at('b-0', 2), C.paste({ text: '## H\n\n- x\n- y' }));
         expect(r.md).toBe('ab\n\n## H\n\n- x\n- y\n');
         expect(r.state.selection).toEqual(at('b-2.1.0', 1));
         // At the start of an empty paragraph the first block replaces it instead of leaving an empty paragraph behind.
-        const empty = run('', at('b-0', 0), C.pasteText('## H\n\ntext'));
+        const empty = run('', at('b-0', 0), C.paste({ text: '## H\n\ntext' }));
         expect(empty.md).toBe('## H\n\ntext\n');
         expect(empty.state.selection).toEqual(at('b-1', 4));
     });
 
     it('pastes blocks after a code block', () => {
-        const r = run('```\nx\n```', at('b-0', 1), C.pasteText('a\n\nb'));
+        const r = run('```\nx\n```', at('b-0', 1), C.paste({ text: 'a\n\nb' }));
         expect(r.md).toBe('```\nx\n```\n\na\n\nb\n');
         expect(r.state.selection).toEqual(blockSelection('b-1', 'b-2'));
+    });
+});
+
+describe('paste by flavour', () => {
+    it('takes the first flavour a format reads: text/markdown over text/plain, and plain text as markdown', () => {
+        const r = run('ab', at('b-0', 1), C.paste({ text: 'plain', 'text/markdown': '**md**' }));
+        expect(r.md).toBe('a**md**b\n');
+        expect(run('ab', at('b-0', 1), C.paste({ text: '*em*' })).md).toBe('a*em*b\n');
+    });
+
+    it('falls back to plain text when no format reads a flavour present', () => {
+        const text = run('ab', at('b-0', 1), (s, d) => C.paste({ text: '*em*' })(s, d, { schema, formats: [] }));
+        expect(text.md).toBe('a\\*em\\*b\n');
+        const plain = run('ab', at('b-0', 1), (s, d) => C.paste({ text: 'one\n\ntwo' })(s, d, { schema, formats: [plainTextFormat] }));
+        expect(plain.md).toBe('aone\n\ntwob\n');
+        expect(run('ab', at('b-0', 1), C.paste({ text: '' })).ok).toBe(false);
+    });
+});
+
+describe('Enter and Backspace chains', () => {
+    it('splitBlock tries the list item, then the quote edge, then the plain split', () => {
+        expect(run('- a', at('b-0.0.0', 1), C.splitBlock).md).toBe('- a\n-\n');
+        // the plain split alone stays inside the item: a second paragraph, not a second item
+        const plain = run('- a', at('b-0.0.0', 1), C.splitTextBlock).state.doc.children[0] as { children: { children: { type: string }[] }[] };
+        expect(plain.children).toHaveLength(1);
+        expect(plain.children[0].children.map((c) => c.type)).toEqual(['paragraph', 'paragraph']);
+        // an empty paragraph ending a quote lifts out
+        expect(run(doc({ type: 'blockquote', children: [p('a'), p()] }), at('b-0.1', 0), C.splitBlock).state.doc.children.map((c) => c.type)).toEqual(['blockquote', 'paragraph']);
+        expect(run('ab', at('b-0', 1), C.splitBlock).md).toBe('a\n\nb\n');
+    });
+
+    it('joinBackward converts a non-default block first, then handles lists and quotes, then joins', () => {
+        expect(run('- # h', at('b-0.0.0', 0), C.joinBackward).md).toBe('- h\n');
+        expect(run('- h', at('b-0.0.0', 0), C.joinBackward).md).toBe('h\n');
+        expect(run('> h', at('b-0.0', 0), C.joinBackward).md).toBe('h\n');
+        expect(run('a\n\nb', at('b-1', 0), C.joinBackward).md).toBe('ab\n');
+        expect(run('a\n\nb', at('b-1', 0), C.joinBackwardInList).ok).toBe(false);
     });
 });
 

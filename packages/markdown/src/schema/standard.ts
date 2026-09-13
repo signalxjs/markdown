@@ -67,6 +67,7 @@ export const standardNodes: readonly NodeSpec[] = [
         // table commands), so `setBlockType('tableCell')` is refused.
         type: 'tableCell',
         role: 'textblock',
+        isolating: true,
         toInline: (node) => (node as Parent).children as PhrasingContent[],
         props: (_node, ctx) => {
             const row = ctx.ancestors[ctx.ancestors.length - 1];
@@ -98,11 +99,13 @@ export const standardNodes: readonly NodeSpec[] = [
         type: 'blockquote',
         role: 'container',
         fillsWith: 'paragraph',
+        collapsesWhenEmpty: true,
         menu: { label: 'Quote', icon: 'quote', group: 'basic', keywords: ['blockquote', 'quote'], create: () => ({ type: 'blockquote', children: [paragraphOf('')] }) },
     },
     {
         type: 'list',
         role: 'container',
+        collapsesWhenEmpty: true,
         menu: { label: 'Bulleted list', icon: 'list', group: 'basic', keywords: ['bullet', 'list', 'ul'], create: () => ({ type: 'list', ordered: false, spread: false, children: [{ type: 'listItem', spread: false, children: [paragraphOf('')] }] }) },
         props: (node) => {
             const n = node as List;
@@ -113,6 +116,8 @@ export const standardNodes: readonly NodeSpec[] = [
         type: 'listItem',
         role: 'container',
         fillsWith: 'paragraph',
+        collapsesWhenEmpty: true,
+        moveAsUnit: true,
         props: (node, ctx) => {
             const list = ctx.parent as List | undefined;
             const item = node as ListItem;
@@ -124,6 +129,7 @@ export const standardNodes: readonly NodeSpec[] = [
     {
         type: 'table',
         role: 'table',
+        isolating: true,
         menu: {
             label: 'Table',
             icon: 'table',
@@ -140,7 +146,7 @@ export const standardNodes: readonly NodeSpec[] = [
         },
         props: (node) => ({ align: tableAlign(node as Table) }),
     },
-    { type: 'tableRow', role: 'container', props: (_node, ctx) => ({ header: ctx.index === 0, index: ctx.index }) },
+    { type: 'tableRow', role: 'container', isolating: true, props: (_node, ctx) => ({ header: ctx.index === 0, index: ctx.index }) },
     { type: 'text', role: 'inline', props: (node) => ({ value: (node as Literal).value }), text: (node) => (node as Literal).value },
     { type: 'break', role: 'inline', inline: { kind: 'break' }, text: () => '\n' },
     { type: 'strong', role: 'mark', inline: { priority: 2 } },

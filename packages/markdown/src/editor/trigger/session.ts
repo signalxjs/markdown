@@ -16,7 +16,8 @@
  * `debounce` batches fast typing.
  */
 
-import type { Command, Dispatch, commands } from '../commands.js';
+import type { Command, Dispatch } from '../commands.js';
+import type { commands } from '../registry.js';
 import type { InlineFlat } from '../inline-flat.js';
 import type { EditorState } from '../state.js';
 

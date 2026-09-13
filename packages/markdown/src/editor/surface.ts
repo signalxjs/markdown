@@ -9,6 +9,7 @@
  * `boundary` event the core answers by running its keymap.
  */
 
+import type { PasteData } from './paste.js';
 import type { Schema } from '../schema/index.js';
 import type { InlineFlat } from './inline-flat.js';
 
@@ -61,10 +62,9 @@ export interface SurfaceBoundaryEvent {
     goalX?: number;
 }
 
+/** Clipboard flavours (`text` plus MIME-keyed ones) and the range they replace. */
 export interface SurfacePasteEvent {
-    text: string;
-    markdown?: string;
-    html?: string;
+    data: PasteData;
     range: Range;
 }
 

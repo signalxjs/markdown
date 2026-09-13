@@ -9,12 +9,14 @@ import { applyTransaction } from '../../src/editor/transaction.js';
 import type { Transaction, TransactionMeta } from '../../src/editor/transaction.js';
 import { insertText } from '../../src/editor/commands.js';
 import type { CommandContext } from '../../src/editor/commands.js';
-import { applyEnterRules, applyInputRules, baseInputRules, enterInputRules, isInputRuleEntry, TRIGGER_CHARS } from '../../src/editor/input-rules.js';
+import { applyEnterRules, applyInputRules, isInputRuleEntry, triggerChars } from '../../src/editor/input-rules.js';
+import { markdownEnterRules as enterInputRules, markdownInputRules as baseInputRules } from '../../src/editor/markdown/index.js';
+import { markdownFormat } from '../../src/markdown/index.js';
 import type { InputRule } from '../../src/editor/input-rules.js';
 import { createHistory } from '../../src/editor/history.js';
 
 const schema = markdownSchema;
-const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
+const ctx: CommandContext = { schema, formats: [markdownFormat] };
 
 const doc = (...children: BlockContent[]): Root => ({ type: 'root', children });
 /** A paragraph holding `text` literally (markdown would parse `**a*` or a fence). */
@@ -45,7 +47,7 @@ function type(md: string | Root, selection: EditorSelection, text: string, opts:
 
 function enter(md: string | Root, selection: EditorSelection) {
     const state = stateOf(md, selection);
-    const tr = applyEnterRules(state, ctx);
+    const tr = applyEnterRules(state, ctx, enterInputRules);
     const next = tr ? apply(state, tr) : state;
     return { fired: !!tr, tr, md: toMarkdown(next.doc), state: next };
 }
@@ -59,7 +61,8 @@ describe('applyInputRules gating', () => {
         expect(type('', at('b-0', 0), '# ', { origin: 'paste' }).fired).toBe(false);
         // Text not ending in a trigger character.
         expect(type(doc(p('#')), at('b-0', 1), ' x').fired).toBe(false);
-        expect(TRIGGER_CHARS.has(' ')).toBe(true);
+        expect(triggerChars(baseInputRules).has(' ')).toBe(true);
+        expect(triggerChars([])).toEqual(new Set());
     });
 
     it('ignores transactions that are not typing', () => {
@@ -226,6 +229,7 @@ describe('inline rules', () => {
         const shout: InputRule = {
             name: 'shout',
             scope: 'inline',
+            triggers: [' '],
             match: /!! $/,
             blockTypes: ['heading'],
             handler: (rc) => ({ steps: [{ type: 'replaceInline', key: rc.key, from: rc.from, to: rc.to, slice: { text: '! ', spans: [] } }], meta: { origin: 'inputRule', inputRule: 'shout' } }),
@@ -250,7 +254,7 @@ describe('applyEnterRules', () => {
         // `---` alone parses as a setext underline / hr, so build the paragraph by hand.
         for (const text of ['---', '***', '___', '-----']) {
             const state = stateOf(doc(p(text)), at('b-0', text.length));
-            const tr = applyEnterRules(state, ctx);
+            const tr = applyEnterRules(state, ctx, enterInputRules);
             expect(tr).not.toBeNull();
             const next = apply(state, tr!);
             expect(next.doc.children.map((c) => c.type)).toEqual(['thematicBreak', 'paragraph']);

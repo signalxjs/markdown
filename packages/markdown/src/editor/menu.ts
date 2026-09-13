@@ -4,7 +4,8 @@
  * entry creates, and a fuzzy-ish filter over menu entries.
  */
 
-import { insertBlockAfter, setBlockType, toggleList, wrapInBlockquote, type Command } from './commands.js';
+import { insertBlockAfter, setBlockType, type Command } from './commands.js';
+import { toggleList, wrapInBlockquote } from './commands-standard.js';
 import type { NodeSpec } from '../schema/index.js';
 
 /** The command a menu entry runs: text and code blocks convert the block in place, lists and quotes wrap it, everything else inserts after it (replacing an empty paragraph). */

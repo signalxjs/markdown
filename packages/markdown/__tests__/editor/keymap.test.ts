@@ -6,13 +6,14 @@ import { createState, textSelection } from '../../src/editor/state.js';
 import type { EditorSelection } from '../../src/editor/state.js';
 import { applyTransaction } from '../../src/editor/transaction.js';
 import type { Transaction } from '../../src/editor/transaction.js';
-import { commands } from '../../src/editor/commands.js';
+import { commands } from '../../src/editor/registry.js';
 import type { Command, CommandContext } from '../../src/editor/commands.js';
+import { markdownFormat } from '../../src/markdown/index.js';
 import { baseKeymap, resolveKeymap, runKeymap } from '../../src/editor/keymap.js';
 import type { Keymap } from '../../src/editor/keymap.js';
 
 const schema = markdownSchema;
-const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
+const ctx: CommandContext = { schema, formats: [markdownFormat] };
 
 /** Run a key through a resolved keymap against a document + selection. */
 function press(md: string, selection: EditorSelection, name: string, maps: readonly Keymap[] = [baseKeymap]) {

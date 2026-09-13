@@ -17,6 +17,7 @@
  */
 
 import { flatEquals } from '../inline-flat.js';
+import type { PasteData } from '../paste.js';
 import type { InlineFlat } from '../inline-flat.js';
 import { keyNames } from '../keys.js';
 import type { KeyPlatform } from '../keys.js';
@@ -318,12 +319,14 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
         }
         const data = e.clipboardData;
         if (!data) return;
-        const text = data.getData('text/plain');
-        const markdown = data.getData('text/markdown') || undefined;
-        const html = data.getData('text/html') || undefined;
+        const flavours: PasteData = { text: data.getData('text/plain') };
+        for (const type of Array.from(data.types ?? [])) {
+            if (type === 'text/plain' || type === 'Files') continue;
+            const value = data.getData(type);
+            if (value) flavours[type] = value;
+        }
         const range = currentRange() ?? lastRange ?? { start: length(), end: length() };
-        const ev = markdown === undefined && html === undefined ? { text, range } : { text, range, ...(markdown !== undefined ? { markdown } : {}), ...(html !== undefined ? { html } : {}) };
-        if (events.paste(ev)) e.preventDefault();
+        if (events.paste({ data: flavours, range })) e.preventDefault();
     };
 
     const onDrop = (e: Event): void => {
