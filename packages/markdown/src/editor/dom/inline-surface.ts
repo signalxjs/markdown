@@ -119,7 +119,7 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
     host.setAttribute('aria-multiline', 'false');
     host.setAttribute('spellcheck', 'true');
     if (init.placeholder !== undefined) host.setAttribute('data-placeholder', init.placeholder);
-    renderInline(host, init.flat, { atoms: opts.atoms });
+    renderInline(host, init.flat, { atoms: opts.atoms, schema: init.schema });
     syncEmpty(init.flat);
 
     function syncEmpty(flat: InlineFlat): void {
@@ -384,7 +384,7 @@ export function createDomInlineSurface(host: HTMLElement, init: InlineSurfaceIni
             const focused = d.activeElement === host || host.contains(d.activeElement);
             const range = focused ? currentRange() : null;
             known = flat;
-            renderInline(host, flat, { atoms: opts.atoms });
+            renderInline(host, flat, { atoms: opts.atoms, schema: init.schema });
             syncEmpty(flat);
             if (range) applySelection(range);
         },

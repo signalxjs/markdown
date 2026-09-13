@@ -1,14 +1,18 @@
 /**
- * `<MarkdownEditor>` — the web block editor.
+ * `<RichTextEditor>` — the web block editor.
  *
  * One `createEditor()` instance per component; every root block renders as
  * a keyed `<BlockView>`, so structural sharing in the state means an
- * untouched block is never re-rendered or re-mounted. Two-way binding through
- * the `markdown` (string) and `document` (mdast `Root`) models — bind either
- * or both; the editor writes back after every committed transaction and
- * ignores its own echo. Toolbar, block handles + menu, slash commands and
- * mention suggestions are the built-in chrome; every element carries
- * `data-scope` / `data-part` attributes for styling.
+ * untouched block is never re-rendered or re-mounted. The editor knows no
+ * syntax: `format` is the codec the `source` model and the controller read
+ * and write with, `formats` are further codecs pasted flavours are read
+ * with, and the presets among `plugins` bring the syntax shortcuts and the
+ * clipboard flavours. Two-way binding through the `source` (string) and
+ * `document` (mdast `Root`) models — bind either or both; the editor writes
+ * back after every committed transaction and ignores its own echo. Toolbar,
+ * block handles + menu, slash commands and mention suggestions are the
+ * built-in chrome; every element carries `data-scope` / `data-part`
+ * attributes for styling.
  *
  * On the server (and before mount) the same document renders through
  * `<RichTextView>`, so SSR output is the read-only markup.
@@ -16,7 +20,7 @@
  * @example
  * ```tsx
  * const state = signal({ md: '# Hi' });
- * <MarkdownEditor model:markdown={[state, 'md']} placeholder="Write…" />
+ * <RichTextEditor format={markdownFormat} plugins={[markdownPreset]} model:source={[state, 'md']} placeholder="Write…" />
  * ```
  */
 
@@ -25,12 +29,9 @@ import { component, mergeProps, type Define, type JSXElement } from '@sigx/runti
 import type {} from '@sigx/runtime-dom';
 import { defineProvide } from '@sigx/runtime-core';
 import type { Root } from '../../ast/index.js';
+import type { DocumentFormat } from '../../document/index.js';
 import { createDomComponents, RichTextView, type DomComponents } from '../../dom/index.js';
-import { markdownFormat } from '../../markdown/index.js';
-import { markdownPreset } from '../markdown/index.js';
-import { parseMarkdown } from '../../parser/index.js';
 import type { RichTextPlugin } from '../../plugin/index.js';
-import { toMarkdown } from '../../serializer/index.js';
 import { deleteBlock, escapeToText, focusEnd, focusNeighbour, selectedBlockKeys, type Command } from '../commands.js';
 import { createEditor, type Editor } from '../editor.js';
 import type { InputRule } from '../input-rules.js';
@@ -45,26 +46,30 @@ import { commands as commandRegistry } from '../registry.js';
 import { editorPart, flag } from './anatomy.js';
 import { BlockView } from './BlockView.js';
 import { BlockMenu } from './BlockMenu.js';
+import { standardContainerViews, type ContainerView } from './containers.js';
 import { createEditorView, useEditorView, type EditorView } from './context.js';
 import { track } from './context.js';
 import type { AtomRenderer } from './inline-dom.js';
 import { defaultAtomRenderer } from './inline-dom.js';
 import { SuggestionPopup, type SuggestionRenderItem } from './SuggestionPopup.js';
 import { EditorToolbar, type ToolbarRenderItem } from './Toolbar.js';
-import { pluginAtomRenderers } from './plugin-atoms.js';
+import { pluginAtomRenderers, pluginContainerViews } from './plugin-dom.js';
 
-export interface MarkdownEditorChange {
-    markdown: string;
+export interface RichTextEditorChange {
+    /** The document in the primary format. */
+    source: string;
     document: Root;
     transaction: Transaction;
 }
 
 /** The imperative API exposed through `ref`. */
-export interface MarkdownEditorController {
+export interface RichTextEditorController {
     readonly editor: Editor;
-    getMarkdown(): string;
+    /** Serialize the document with the primary format (or the installed format `formatId`). */
+    getSource(formatId?: string): string;
     getDocument(): Root;
-    setMarkdown(markdown: string): void;
+    /** Replace the document from source in the primary format (or the installed format `formatId`). */
+    setSource(source: string, formatId?: string): void;
     setDocument(doc: Root): void;
     /** Run a command (a function or a registered name). */
     run(command: Command | string): boolean;
@@ -75,19 +80,25 @@ export interface MarkdownEditorController {
     redo(): boolean;
 }
 
-export type MarkdownEditorProps = Define.WithAttrs<
-    /** Two-way bound markdown source. */
-    & Define.Model<'markdown', string>
-    /** Two-way bound mdast document (wins over `markdown` for the initial value). */
+export type RichTextEditorProps = Define.WithAttrs<
+    /** The primary format: what the `source` model, `defaultSource` and the controller read and write. */
+    & Define.Prop<'format', DocumentFormat, true>
+    /** Further formats the editor reads pasted flavours with. */
+    & Define.Prop<'formats', readonly DocumentFormat[]>
+    /** Two-way bound source in the primary format. */
+    & Define.Model<'source', string>
+    /** Two-way bound mdast document (wins over `source` for the initial value). */
     & Define.Model<'document', Root>
-    & Define.Prop<'defaultMarkdown', string>
+    & Define.Prop<'defaultSource', string>
     & Define.Prop<'defaultDocument', Root>
-    /** Plugins (syntax, serializer, components and editor slices). Captured at mount. */
+    /** Plugins (node types, syntax, components and editor slices; the format presets go here). Captured at mount. */
     & Define.Prop<'plugins', readonly RichTextPlugin[]>
     /** Components for void blocks and the SSR/read-only rendering (overrides of the default DOM map). */
     & Define.Prop<'components', Partial<DomComponents>>
     /** Extra atom renderers by node type (images, mentions, plugin atoms). */
     & Define.Prop<'atoms', Record<string, AtomRenderer>>
+    /** Extra container views by block type (over the standard and plugin ones). */
+    & Define.Prop<'containers', Record<string, ContainerView>>
     /** `true` / `'top'` renders the toolbar above the content, `'bottom'` below, `false` none. Default `true`. */
     & Define.Prop<'toolbar', boolean | 'top' | 'bottom'>
     & Define.Prop<'toolbarItems', readonly ToolbarItem[]>
@@ -100,21 +111,24 @@ export type MarkdownEditorProps = Define.WithAttrs<
     & Define.Prop<'autofocus', boolean>
     /** Extra keymap layered over the base and plugin keymaps. */
     & Define.Prop<'keymap', Keymap>
-    /** `false` disables input rules; an array replaces the base set. */
+    /** `false` disables input rules (the presets' included); an array adds to them. */
     & Define.Prop<'inputRules', readonly InputRule[] | false>
-    & Define.Prop<'onChange', (e: MarkdownEditorChange) => void>
+    & Define.Prop<'onChange', (e: RichTextEditorChange) => void>
     & Define.Prop<'onSelectionChange', (selection: EditorSelection) => void>
-    & Define.Event<'ready', MarkdownEditorController>
+    & Define.Event<'ready', RichTextEditorController>
 >;
 
 const OWN_PROPS = [
-    'markdown',
+    'format',
+    'formats',
+    'source',
     'document',
-    'defaultMarkdown',
+    'defaultSource',
     'defaultDocument',
     'plugins',
     'components',
     'atoms',
+    'containers',
     'toolbar',
     'toolbarItems',
     'renderToolbarItem',
@@ -145,20 +159,21 @@ const BLOCK_KEYS: Record<string, Command> = {
     Enter: escapeToText,
 };
 
-export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorController>(({ props, expose, emit, onMounted, onUnmounted, signal }) => {
+export const RichTextEditor = component<RichTextEditorProps, RichTextEditorController>(({ props, expose, emit, onMounted, onUnmounted, signal }) => {
     const plugins = props.plugins ?? [];
-    const parse = (md: string): Root => parseMarkdown(md, { plugins });
-    const serialize = (doc: Root): string => toMarkdown(doc, { plugins });
+    const format = props.format;
 
     let rootEl: HTMLElement | null = null;
     const mounted = signal(false);
-    let lastEmittedMarkdown: string | null = null;
+    let lastEmittedSource: string | null = null;
     let lastEmittedDoc: Root | null = null;
 
     // -- the view context -------------------------------------------------
 
     const atoms = new Map<string, AtomRenderer>([['image', imageAtom], ...pluginAtomRenderers(plugins)]);
     for (const [type, render] of Object.entries(props.atoms ?? {})) atoms.set(type, render);
+    const containers = new Map<string, ContainerView>([...standardContainerViews, ...pluginContainerViews(plugins)]);
+    for (const [type, render] of Object.entries(props.containers ?? {})) containers.set(type, render);
 
     const defaults = createDomComponents({});
     const components = (): DomComponents => (props.components ? { ...defaults, ...props.components } : defaults);
@@ -173,9 +188,10 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
     };
 
     const editor = createEditor({
-        doc: clone(props.document?.value ?? props.defaultDocument ?? parse(props.markdown?.value ?? props.defaultMarkdown ?? '')),
-        plugins: [markdownPreset, ...plugins],
-        format: markdownFormat,
+        doc: clone(props.document?.value ?? props.defaultDocument ?? format.parse(props.source?.value ?? props.defaultSource ?? '', { plugins })),
+        plugins,
+        format,
+        formats: props.formats,
         keymap: { ArrowUp: focusNeighbour('up', offsetAt), ArrowDown: focusNeighbour('down', offsetAt), ...props.keymap },
         inputRules: props.inputRules,
         platform: { isMac: isMacPlatform(), hasHardwareKeyboard: true, caretRectSpace: 'editor' },
@@ -183,21 +199,30 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
         onChange: ({ state, transaction }) => {
             const doc = state.doc;
             lastEmittedDoc = doc;
-            let md: string | null = null;
-            const markdown = (): string => (md ??= serialize(doc));
-            if (props.markdown) {
-                lastEmittedMarkdown = markdown();
-                props.markdown.value = lastEmittedMarkdown;
+            let src: string | null = null;
+            const source = (): string => (src ??= serialize(doc));
+            if (props.source) {
+                lastEmittedSource = source();
+                props.source.value = lastEmittedSource;
             }
             if (props.document) props.document.value = doc;
-            if (props.onChange) props.onChange({ markdown: markdown(), document: doc, transaction });
+            if (props.onChange) props.onChange({ source: source(), document: doc, transaction });
         },
         onSelectionChange: (selection) => props.onSelectionChange?.(selection),
     });
 
+    const formatById = (formatId?: string): DocumentFormat => {
+        if (formatId === undefined) return format;
+        const found = editor.formats.find((f) => f.id === formatId);
+        if (!found) throw new Error(`[@sigx/markdown] No format "${formatId}" is installed in this editor.`);
+        return found;
+    };
+    const serialize = (doc: Root, formatId?: string): string => formatById(formatId).serialize(doc, { plugins });
+
     view = createEditorView({
         editor,
         atoms,
+        containers,
         root: () => rootEl,
         readOnly: () => editor.readOnly,
         placeholder: () => props.placeholder,
@@ -209,11 +234,11 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
     // -- models in -----------------------------------------------------------
 
     watch(
-        () => props.markdown?.value,
-        (md) => {
-            if (typeof md !== 'string' || md === lastEmittedMarkdown) return;
-            lastEmittedMarkdown = md;
-            editor.setSource(md, 'markdown');
+        () => props.source?.value,
+        (src) => {
+            if (typeof src !== 'string' || src === lastEmittedSource) return;
+            lastEmittedSource = src;
+            editor.setSource(src);
         },
     );
     watch(
@@ -352,14 +377,17 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
         if (sel?.mode === 'text') view.focusBlock(sel.anchor.key, { edge: 'end' });
     };
 
+    /** Copy a block selection: every flavour the plugins' clipboard writers produce; the primary format as `text/plain` when none sets it. */
     const onCopy = (e: ClipboardEvent): void => {
         const sel = editor.state.selection;
         if (sel?.mode !== 'block' || !e.clipboardData) return;
         const keys = new Set(selectedBlockKeys(editor.state));
-        const blocks = editor.state.doc.children.filter((b) => keys.has(b.key!));
-        const md = serialize({ type: 'root', children: blocks });
-        e.clipboardData.setData('text/markdown', md);
-        e.clipboardData.setData('text/plain', md);
+        const root: Root = { type: 'root', children: editor.state.doc.children.filter((b) => keys.has(b.key!)) };
+        const flavours = editor.clipboard(root);
+        if (!flavours.text) flavours.text = serialize(root);
+        for (const [mime, value] of Object.entries(flavours)) {
+            if (typeof value === 'string') e.clipboardData.setData(mime === 'text' ? 'text/plain' : mime, value);
+        }
         e.preventDefault();
     };
 
@@ -389,11 +417,11 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
 
     // -- controller ------------------------------------------------------------
 
-    const controller: MarkdownEditorController = {
+    const controller: RichTextEditorController = {
         editor,
-        getMarkdown: () => serialize(editor.state.doc),
+        getSource: (formatId) => serialize(editor.state.doc, formatId),
         getDocument: () => editor.state.doc,
-        setMarkdown: (md) => void editor.setSource(md, 'markdown'),
+        setSource: (source, formatId) => void editor.setSource(source, formatId),
         setDocument: (doc) => editor.setDocument(clone(doc)),
         run: (command) => editor.run(command),
         focus: (target = 'end') => {
@@ -430,7 +458,7 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
         () => {
             const rest: Record<string, unknown> = { ...props };
             for (const key of OWN_PROPS) delete rest[key];
-            delete rest['model:markdown'];
+            delete rest['model:source'];
             delete rest['model:document'];
             return rest;
         },
@@ -442,7 +470,7 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
             track(editor.rev.value);
             return (
                 <div {...rootAttrs} data-readonly="" data-ssr="">
-                    <RichTextView root={editor.state.doc} format={markdownFormat} plugins={plugins} components={props.components} />
+                    <RichTextView root={editor.state.doc} format={format} plugins={plugins} components={props.components} />
                 </div>
             );
         }

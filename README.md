@@ -26,7 +26,7 @@ Full guides, API reference and live examples → **<https://sigx.dev/markdown/>*
 | `@sigx/markdown/dom` | `RichTextView` for the web — default components styled through `data-scope` / `data-part` attributes, a `CodeBlock` chrome with copy button, the `CodeHighlighter` contract |
 | `@sigx/markdown/shiki` | Shiki highlighting as a plugin: `shikiPlugin()` / `createShikiHighlighter()` (`shiki` is an optional peer) |
 | `@sigx/markdown/editor` | The block-tree editor core: state, commands, history, keymap, input rules, triggers and the surface contract a platform implements |
-| `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web — a Notion-class block editor: contenteditable surfaces per block, toolbar, block handles and menu, slash commands, mentions, two-way `markdown` / `document` models |
+| `@sigx/markdown/editor/dom` | `RichTextEditor` for the web — a Notion-class block editor: contenteditable surfaces per block, toolbar, block handles and menu, slash commands, mentions, two-way `source` / `document` models |
 
 Examples: [`examples/playground`](./examples/playground) — the view, streaming, plugins, Shiki, the serializer and the editor side by side, with a Playwright suite.
 

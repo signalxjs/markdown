@@ -8,10 +8,10 @@
  * attributes (the playground's `editor.css` is the reference).
  */
 
-export const EDITOR_SCOPE = 'markdown-editor';
-export const TOOLBAR_SCOPE = 'markdown-toolbar';
-export const BLOCK_MENU_SCOPE = 'markdown-block-menu';
-export const SUGGEST_SCOPE = 'markdown-suggest';
+export const EDITOR_SCOPE = 'richtext-editor';
+export const TOOLBAR_SCOPE = 'richtext-toolbar';
+export const BLOCK_MENU_SCOPE = 'richtext-block-menu';
+export const SUGGEST_SCOPE = 'richtext-suggest';
 
 export type EditorPart =
     | 'root'

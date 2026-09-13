@@ -14,7 +14,7 @@ block-tree editor. Zero dependencies, no `node:` imports.
 | `@sigx/markdown/dom` | `RichTextView` for the web, the default DOM components (`data-scope` / `data-part` styling seam), the `CodeBlock` chrome, the `CodeHighlighter` contract and `highlightedCodeBlock()` |
 | `@sigx/markdown/shiki` | `createShikiHighlighter()` + `shikiPlugin()` — Shiki behind the `CodeHighlighter` contract (`shiki` is an optional peer) |
 | `@sigx/markdown/editor` | the block-tree editor core: `createEditor()`, state, steps, history, commands, keymap, input rules, triggers, toolbar items and the `InlineSurface` / `CodeSurface` contracts a platform implements |
-| `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web: `contenteditable` block surfaces, toolbar, block menu, slash commands, mentions, two-way `markdown` / `document` models, `data-scope` / `data-part` styling |
+| `@sigx/markdown/editor/dom` | `RichTextEditor` for the web: `contenteditable` block surfaces, toolbar, block menu, slash commands, mentions, two-way `source` / `document` models, `data-scope` / `data-part` styling |
 
 ## Install
 
@@ -53,7 +53,7 @@ const plugins = [shikiPlugin()];
 <RichTextView value={stream.value.value} format={markdownFormat} plugins={plugins} onLink={(url) => router.push(url)} />
 ```
 
-Every element carries `data-scope="markdown"` and `data-part="heading"`,
+Every element carries `data-scope="richtext"` and `data-part="heading"`,
 `"code"`, `"link"`, … — style them with attribute selectors (the playground's
 `styles.css` is the reference stylesheet), or pass `classPrefix="md"` for
 `md-heading`-style classes, or replace any slot through `components`.
@@ -62,22 +62,26 @@ Editing:
 
 ```tsx
 import { signal } from 'sigx';
-import { createSlashPlugin } from '@sigx/markdown/editor';
-import { MarkdownEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
+import { markdownFormat } from '@sigx/markdown';
+import { createSlashPlugin, markdownPreset } from '@sigx/markdown/editor';
+import { RichTextEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
 
-const plugins = [createDomMentionPlugin({ onQuery: (q) => people(q) }), createSlashPlugin()];
+const plugins = [markdownPreset, createDomMentionPlugin({ onQuery: (q) => people(q) }), createSlashPlugin()];
 const note = signal({ md: '# Hi' });
 
-<MarkdownEditor model:markdown={[note, 'md']} plugins={plugins} placeholder="Write…" />
+<RichTextEditor format={markdownFormat} model:source={[note, 'md']} plugins={plugins} placeholder="Write…" />
 ```
 
 A block-tree editor on the same mdast document: one `contenteditable` per
 paragraph or heading, a `<textarea>` per code block, Enter / Backspace /
-arrows / Tab handled by the core, markdown input rules (`# `, `- `,
-`**bold**`), undo grouped by typing, a toolbar, block handles with a menu,
-`/` commands and `@` mentions. Elements carry `data-scope="markdown-editor"`
-(and `markdown-toolbar`, `markdown-block-menu`, `markdown-suggest`) with
-`data-part` — the playground's `editor.css` is the reference stylesheet.
+arrows / Tab handled by the core, undo grouped by typing, a toolbar, block
+handles with a menu, `/` commands and `@` mentions. The editor knows no
+syntax: `format` is what the `source` model and the controller read and
+write with, and `markdownPreset` brings the input rules (`# `, `- `,
+`**bold**`) and the `text/markdown` clipboard flavour. Elements carry
+`data-scope="richtext-editor"` (and `richtext-toolbar`,
+`richtext-block-menu`, `richtext-suggest`) with `data-part` — the
+playground's `editor.css` is the reference stylesheet.
 
 ## Documentation
 

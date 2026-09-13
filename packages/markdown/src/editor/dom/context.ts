@@ -1,9 +1,10 @@
 /**
  * The view context every block component reads: the editor instance, the
  * surface registry, focus tracking, the last arrow goal-x, and the options
- * that reach the surfaces (atom renderers, placeholder, read-only).
+ * that reach the surfaces and block views (atom renderers, container views,
+ * placeholder, read-only).
  *
- * Provided by `<MarkdownEditor>` through an injectable so nested blocks
+ * Provided by `<RichTextEditor>` through an injectable so nested blocks
  * (list items in quotes in lists) need no prop drilling.
  */
 
@@ -12,6 +13,7 @@ import { defineInjectable } from '@sigx/runtime-core';
 import type { Editor } from '../editor.js';
 import { selectedBlockKeys } from '../commands.js';
 import type { AnySurface } from '../surface.js';
+import type { ContainerView } from './containers.js';
 import type { AtomRenderer } from './inline-dom.js';
 import type { DomComponents } from '../../dom/index.js';
 
@@ -35,6 +37,8 @@ export interface EditorView {
     /** The x-goal of the last ArrowUp/Down boundary, for the neighbour to land under. */
     goalX: number | undefined;
     readonly atoms: ReadonlyMap<string, AtomRenderer>;
+    /** Container views by block type (the standard ones plus the plugins'). */
+    readonly containers: ReadonlyMap<string, ContainerView>;
     /** Keys of the blocks in the current block selection (empty for a text selection). */
     readonly selectedKeys: Computed<ReadonlySet<string>>;
     readOnly(): boolean;
@@ -58,13 +62,14 @@ export interface EditorView {
     focusOut(): void;
 }
 
-export const useEditorView = defineInjectable<EditorView>('MarkdownEditorView', {
-    hint: 'Editor block components render inside <MarkdownEditor>.',
+export const useEditorView = defineInjectable<EditorView>('RichTextEditorView', {
+    hint: 'Editor block components render inside <RichTextEditor>.',
 });
 
 export interface CreateViewOptions {
     editor: Editor;
     atoms: ReadonlyMap<string, AtomRenderer>;
+    containers: ReadonlyMap<string, ContainerView>;
     root(): HTMLElement | null;
     readOnly(): boolean;
     placeholder(): string | undefined;
@@ -115,6 +120,7 @@ export function createEditorView(opts: CreateViewOptions): EditorView {
         hasFocus: () => focusWithin,
         goalX: undefined,
         atoms: opts.atoms,
+        containers: opts.containers,
         selectedKeys,
         readOnly: opts.readOnly,
         placeholder: opts.placeholder,

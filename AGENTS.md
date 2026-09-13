@@ -171,11 +171,11 @@ through the workspace link), then `pnpm --filter <example-name> dev`.
   mdast-compatible AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`,
   `toJSON` / `fromJSON`, `createMarkdownStream`, the generic `renderDocument`
   engine and the `MarkdownPlugin` contract — platform-free, runs everywhere),
-  `./dom` (`MarkdownView` on `@sigx/runtime-dom`), `./shiki` (optional
+  `./dom` (`RichTextView` on `@sigx/runtime-dom`), `./shiki` (optional
   highlighting; `shiki` is an optional peer), `./editor` (the block-tree editor
   core: state, steps, history, commands, keymap, input rules, schema, the
   `InlineSurface` / `CodeSurface` contracts a platform implements),
-  `./editor/dom` (`MarkdownEditor` for the web) and `./testing` (streaming
+  `./editor/dom` (`RichTextEditor` for the web) and `./testing` (streaming
   harness, `strip()`, the surface conformance suite). Entries land one PR at a
   time; an entry exists once it is in `exports`.
 

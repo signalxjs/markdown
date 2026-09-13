@@ -8,6 +8,35 @@ workspace shares one version line.
 
 ### Changed
 
+- **Format-agnostic DOM editor** (#28, phase 4b of #19). `<RichTextEditor>`
+  replaces `<MarkdownEditor>`: `format` (required) is the codec the
+  `source` model, `defaultSource` and the controller (`getSource(formatId?)`,
+  `setSource(source, formatId?)`) read and write with, `formats` are further
+  codecs pasted flavours are read with, and the presets go in `plugins`
+  (`markdownPreset` is no longer installed implicitly). `model:markdown` /
+  `defaultMarkdown` / `getMarkdown` / `setMarkdown` and the `markdown` field
+  of the change event are `source`. Copying a block selection writes every
+  flavour the plugins' clipboard writers produce (the primary format as
+  `text/plain` when none sets it). The DOM editor entry no longer bundles the
+  markdown parser or serializer.
+- `data-scope` values are `richtext` (the DOM view), `richtext-editor`,
+  `richtext-toolbar`, `richtext-block-menu` and `richtext-suggest` (the
+  editor); stylesheets written against the `markdown-*` scopes must be
+  updated (the playground's are).
+- `<BlockView>` dispatches on the schema role; the list, list item and
+  blockquote wrappers are container views (`standardContainerViews`,
+  `ContainerView`, `defaultContainerView` in the DOM editor entry), a plugin
+  adds its own under `editor.dom.containers` (next to `atoms`;
+  `pluginContainerViews`) and the `containers` prop overrides both. Void
+  blocks are labelled by their spec's menu entry.
+- Mark elements come from the schema: `NodeSpec.html` (`HtmlTagHint { tag,
+  aliases? }`) names the element a mark renders as in the DOM editor (and the
+  aliases read back as it — `b` for `strong`); nesting order on ties is
+  `spec.inline.priority`. `renderInline` takes `schema` in its options;
+  without one every mark is a `span[data-mark]`. The standard marks carry
+  their hints (`strong` / `b`, `em` / `i`, `del` / `s` / `strike`,
+  `code`, `a`).
+
 - **Format-agnostic editor core** (#26, phase 4a of #19). `createEditor` takes
   `format` (the primary format) and `formats` (further ones it reads); the
   schema is the standard specs plus the formats' and plugins' `nodes`.

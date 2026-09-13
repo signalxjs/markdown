@@ -18,8 +18,8 @@ import {
     type NodeProps
 } from '@sigx/markdown';
 import { RichTextView, highlightedCodeBlock, type DomComponents } from '@sigx/markdown/dom';
-import { createSlashPlugin } from '@sigx/markdown/editor';
-import { MarkdownEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
+import { createSlashPlugin, markdownPreset } from '@sigx/markdown/editor';
+import { RichTextEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
 
 // Register the mention node with the AST and type its component slot: this
 // is the consumer-side half of the plugin contract (the package does not do
@@ -96,8 +96,9 @@ const PEOPLE = [
     { id: 'u4', label: 'Dana' }
 ];
 
-/** The editor's plugins: the mention syntax + `@` trigger + chip, and `/` block commands. Captured at mount. */
+/** The editor's plugins: the markdown preset (input rules, clipboard), the mention syntax + `@` trigger + chip, and `/` block commands. Captured at mount. */
 const EDITOR_PLUGINS: readonly RichTextPlugin[] = [
+    markdownPreset,
     createDomMentionPlugin({
         onQuery: (q) => PEOPLE.filter((p) => p.label.toLowerCase().startsWith(q.toLowerCase()))
     }),
@@ -106,7 +107,7 @@ const EDITOR_PLUGINS: readonly RichTextPlugin[] = [
 
 /** The `mention` slot: a plain function, called by the render engine with the node. */
 const MentionChip = ({ node }: NodeProps<JSXElement, Mention>): JSXElement => (
-    <span data-scope="markdown" data-part="mention" title={node.id}>
+    <span data-scope="richtext" data-part="mention" title={node.id}>
         @{node.label}
     </span>
 );
@@ -296,9 +297,10 @@ export const App = component(({ signal, onUnmounted }) => {
                         <h2>Editor</h2>
                         <div class="body">
                             {/* Two-way bound to the same source the panes on the right render. */}
-                            <MarkdownEditor
+                            <RichTextEditor
                                 id="editor"
-                                model:markdown={[state, 'source']}
+                                format={markdownFormat}
+                                model:source={[state, 'source']}
                                 plugins={EDITOR_PLUGINS}
                                 components={{ mention: MentionChip }}
                                 placeholder="Write, or type / for blocks and @ to mention…"
