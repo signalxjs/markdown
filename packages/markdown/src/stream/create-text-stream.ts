@@ -20,7 +20,7 @@
  * await text.pipe(completion, controller.signal);
  *
  * // consumer
- * <RichTextView value={text.value.value} />
+ * <RichTextView value={text.value.value} format={markdownFormat} />
  * ```
  */
 
