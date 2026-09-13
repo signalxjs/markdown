@@ -8,17 +8,15 @@
  * mutates an already finalized block.
  */
 
-import type { Definition, Node, Parent, Root } from './nodes.js';
-
-/** Containers a definition can live in (the CommonMark block containers). */
-const CONTAINERS = new Set(['root', 'blockquote', 'listItem', 'list']);
+import type { Definition, Node, Parent, Root } from '../ast/index.js';
+import { standardSchema, type Schema } from '../schema/index.js';
 
 /**
  * Collect every definition in document order, keyed by `identifier`. The
- * first definition for a label wins (CommonMark). Only container blocks are
- * walked, so the cost is O(blocks), not O(inline nodes).
+ * first definition for a label wins (CommonMark). Only the root and the
+ * schema's containers are walked, so the cost is O(blocks), not O(inline nodes).
  */
-export function collectDefinitions(root: Root): Map<string, Definition> {
+export function collectDefinitions(root: Root, schema: Schema = standardSchema): Map<string, Definition> {
     const out = new Map<string, Definition>();
     const walk = (node: Node): void => {
         if (node.type === 'definition') {
@@ -26,7 +24,7 @@ export function collectDefinitions(root: Root): Map<string, Definition> {
             if (!out.has(def.identifier)) out.set(def.identifier, def);
             return;
         }
-        if (!CONTAINERS.has(node.type)) return;
+        if (node !== root && !schema.isContainer(node.type)) return;
         const children = (node as Parent).children;
         if (!children) return;
         for (const child of children) walk(child);

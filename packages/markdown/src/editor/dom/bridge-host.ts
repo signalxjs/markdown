@@ -11,6 +11,7 @@ export function bridgeHost(view: EditorView): BridgeHost {
         setSelection: editor.setSelection,
         paste: editor.paste,
         flatOf: editor.flatOf,
+        schema: editor.schema,
         valueOf: editor.valueOf,
         focused: editor.focused,
     };

@@ -66,7 +66,7 @@ function keyAt(parentKey: string | null, index: number): string {
 }
 
 function paragraphOf(flat: InlineFlat, ctx: CommandContext): BlockContent {
-    return { type: 'paragraph', children: toInline(flat, ctx.inline) };
+    return { type: 'paragraph', children: toInline(flat, ctx.schema) };
 }
 
 /** Whether an inline-code span touches `[from, to)`. */
@@ -86,7 +86,7 @@ const heading: InputRule = {
         const spec = rc.ctx.schema.get('heading');
         if (!spec?.fromInline) return null;
         const rest = sliceFlat(rc.flat, rc.to, rc.flat.text.length);
-        const node = spec.fromInline(toInline(rest, rc.ctx.inline), { depth: m[1].length });
+        const node = spec.fromInline(toInline(rest, rc.ctx.schema), { depth: m[1].length });
         return ruleTransaction('heading', [{ type: 'replaceBlock', key: rc.key, node }], textSelection(rc.key, 0));
     },
 };
@@ -254,7 +254,7 @@ export const enterInputRules: EnterRule[] = [codeFence, thematicBreak];
 
 function appliesTo(rule: { scope?: 'blockStart' | 'inline'; blockTypes?: string[] }, type: string, ctx: CommandContext): boolean {
     if (rule.blockTypes) return rule.blockTypes.includes(type);
-    if (rule.scope === 'inline') return ctx.schema.kind(type) === 'inline';
+    if (rule.scope === 'inline') return ctx.schema.role(type) === 'textblock';
     return type === 'paragraph';
 }
 
@@ -275,11 +275,11 @@ export function applyInputRules(rules: readonly InputRule[], tr: Transaction, st
     const sel = state.selection;
     if (!sel || sel.mode !== 'text' || sel.anchor.key !== step.key || sel.anchor.offset !== caret || sel.head.offset !== caret) return null;
     const entry = state.index().get(step.key);
-    if (!entry || ctx.schema.kind(entry.node.type) !== 'inline') return null;
-    const flat = flatOf(entry.node, { inline: ctx.inline });
+    if (!entry || ctx.schema.role(entry.node.type) !== 'textblock') return null;
+    const flat = flatOf(entry.node, ctx);
     if (caret > flat.text.length) return null;
     // Never inside inline code.
-    if (marksAt(flat, caret).includes('inlineCode')) return null;
+    if (marksAt(flat, caret, caret, ctx.schema).includes('inlineCode')) return null;
     const text = flat.text.slice(0, caret);
 
     for (const rule of rules) {
@@ -301,8 +301,8 @@ export function applyEnterRules(state: EditorState, ctx: CommandContext, rules: 
     if (!sel || sel.mode !== 'text' || sel.anchor.offset !== sel.head.offset) return null;
     const key = sel.anchor.key;
     const entry = state.index().get(key);
-    if (!entry || ctx.schema.kind(entry.node.type) !== 'inline') return null;
-    const flat = flatOf(entry.node, { inline: ctx.inline });
+    if (!entry || ctx.schema.role(entry.node.type) !== 'textblock') return null;
+    const flat = flatOf(entry.node, ctx);
     if (sel.anchor.offset !== flat.text.length) return null;
     const text = flat.text;
     for (const rule of rules) {

@@ -15,7 +15,8 @@
  *  - Reference resolution, URL sanitisation and the plugin fallbacks.
  */
 
-import { childKey, collectDefinitions, topKey } from '../ast/index.js';
+import { childKey, topKey } from '../ast/index.js';
+import { collectDefinitions } from '../document/index.js';
 import type {
     AlignType,
     BlockContent,

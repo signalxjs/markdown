@@ -81,7 +81,7 @@ export const InlineBlock = component<InlineBlockProps>(({ props, onUnmounted }) 
         const node = toRaw(props.block);
         surface = createDomInlineSurface(
             el,
-            { key, blockType: node.type, attrs: attrsOf(node), flat: editor.flatOf(key) ?? { text: '', spans: [] }, readOnly: view.readOnly(), events },
+            { key, blockType: node.type, schema: editor.schema, attrs: attrsOf(node), flat: editor.flatOf(key) ?? { text: '', spans: [] }, readOnly: view.readOnly(), events },
             { platform: editor.platform, atoms: view.atoms, origin: () => view.root() ?? el },
         );
         unregister = view.register(key, surface);

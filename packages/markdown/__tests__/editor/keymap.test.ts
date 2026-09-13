@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseMarkdown } from '../../src/parser/index.js';
 import { toMarkdown } from '../../src/serializer/index.js';
-import { createSchema } from '../../src/editor/schema.js';
+import { markdownSchema } from '../../src/schema/index.js';
 import { createState, textSelection } from '../../src/editor/state.js';
 import type { EditorSelection } from '../../src/editor/state.js';
 import { applyTransaction } from '../../src/editor/transaction.js';
@@ -11,15 +11,15 @@ import type { Command, CommandContext } from '../../src/editor/commands.js';
 import { baseKeymap, resolveKeymap, runKeymap } from '../../src/editor/keymap.js';
 import type { Keymap } from '../../src/editor/keymap.js';
 
-const schema = createSchema();
+const schema = markdownSchema;
 const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
 
 /** Run a key through a resolved keymap against a document + selection. */
 function press(md: string, selection: EditorSelection, name: string, maps: readonly Keymap[] = [baseKeymap]) {
-    const state = createState(parseMarkdown(md), selection, { editableTypes: schema.editableTypes });
+    const state = createState(parseMarkdown(md), selection, schema);
     let tr: Transaction | null = null;
     const result = runKeymap(resolveKeymap(maps), name, state, (t) => (tr = t), ctx);
-    const next = tr ? applyTransaction(state, tr, {}, schema.editableTypes).state : state;
+    const next = tr ? applyTransaction(state, tr, ctx).state : state;
     return { result, md: toMarkdown(next.doc), state: next, tr: tr as Transaction | null };
 }
 
@@ -87,7 +87,7 @@ describe('runKeymap', () => {
 
     it('hands undo/redo back to the caller without dispatching', () => {
         const dispatch = vi.fn();
-        const state = createState(parseMarkdown('x'), textSelection('b-0', 0), { editableTypes: schema.editableTypes });
+        const state = createState(parseMarkdown('x'), textSelection('b-0', 0), schema);
         const map = resolveKeymap([baseKeymap]);
         expect(runKeymap(map, 'Mod-z', state, dispatch, ctx)).toBe('undo');
         expect(runKeymap(map, 'Mod-Shift-z', state, dispatch, ctx)).toBe('redo');

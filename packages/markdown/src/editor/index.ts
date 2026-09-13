@@ -20,8 +20,6 @@ export {
     blockSelection,
     selectionRange,
     selectionEquals,
-    isContainerType,
-    EDITABLE_TYPES,
 } from './state.js';
 export type {
     EditorState,
@@ -33,7 +31,6 @@ export type {
     BlockEntry,
     EditorBlock,
     EditorParent,
-    CreateStateOptions,
 } from './state.js';
 
 export { applyStep, invertStep, applyMove, updateBlock, updateChildren, rekey, rekeyChildren, flatOf, getBlock, StepError } from './steps.js';
@@ -61,10 +58,10 @@ export {
     mergeAdjacent,
     isPhrasingNode,
 } from './inline-flat.js';
-export type { InlineFlat, InlineSpan, InlineKindSpec, InlineFlatOptions } from './inline-flat.js';
+export type { InlineFlat, InlineSpan } from './inline-flat.js';
 
-export { createSchema, builtinBlockEditors } from './schema.js';
-export type { Schema, BlockEditorSpec, BlockMenuEntry, SurfaceKind } from './schema.js';
+export { createSchema, standardNodes, standardSchema, markdownNodes, markdownSchema } from '../schema/index.js';
+export type { Schema, NodeSpec, NodeRole, InlineFlatSpec, BlockMenuEntry } from '../schema/index.js';
 
 export * as commands from './commands.js';
 export { commands as commandRegistry, selectedBlockKeys } from './commands.js';
@@ -122,5 +119,5 @@ export type { EditorPlugin, EditorPluginSlice } from './plugin.js';
 export { turnIntoCommand, filterMenu } from './menu.js';
 export { createSlashPlugin } from './slash.js';
 export type { SlashItem, SlashPluginOptions } from './slash.js';
-export { createMentionPlugin, mentionInlineKind } from './mention.js';
+export { createMentionPlugin, mentionNode } from './mention.js';
 export type { MentionItem, MentionPluginOptions } from './mention.js';

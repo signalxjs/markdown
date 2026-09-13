@@ -6,6 +6,10 @@ import { applyTransaction, mapSelection, transaction } from '../../src/editor/tr
 import { createHistory } from '../../src/editor/history.js';
 import type { EditorState } from '../../src/editor/state.js';
 import type { Transaction } from '../../src/editor/transaction.js';
+import { markdownSchema } from '../../src/schema/index.js';
+
+const ctx = { schema: markdownSchema };
+const applyTr = (state: EditorState, tr: Transaction) => applyTransaction(state, tr, ctx);
 
 const insert = (key: string, at: number, text: string, extra: Partial<Transaction['meta']> = {}): Transaction =>
     transaction([{ type: 'replaceInline', key, from: at, to: at, slice: { text, spans: [] } }], { origin: 'surface', sourceKey: key, group: 'typing', ...extra }, {
@@ -14,8 +18,8 @@ const insert = (key: string, at: number, text: string, extra: Partial<Transactio
 
 describe('applyTransaction', () => {
     it('applies steps, bumps rev and maps the selection through inline edits', () => {
-        const state = createState(parseMarkdown('ab\n\ncd'), textSelection('b-0', 2));
-        const { state: next, inverse } = applyTransaction(state, transaction([{ type: 'replaceInline', key: 'b-0', from: 1, to: 1, slice: { text: 'X', spans: [] } }], { origin: 'command' }));
+        const state = createState(parseMarkdown('ab\n\ncd'), textSelection('b-0', 2), markdownSchema);
+        const { state: next, inverse } = applyTr(state, transaction([{ type: 'replaceInline', key: 'b-0', from: 1, to: 1, slice: { text: 'X', spans: [] } }], { origin: 'command' }));
         expect(toMarkdown(next.doc)).toBe('aXb\n\ncd\n');
         expect(next.rev).toBe(1);
         expect(next.selection).toEqual(textSelection('b-0', 3));
@@ -24,48 +28,48 @@ describe('applyTransaction', () => {
     });
 
     it('reverses the inverse of a multi-step transaction', () => {
-        const state = createState(parseMarkdown('ab'), null);
+        const state = createState(parseMarkdown('ab'), null, markdownSchema);
         const tr = transaction([
             { type: 'replaceInline', key: 'b-0', from: 2, to: 2, slice: { text: 'c', spans: [] } },
             { type: 'insertBlock', parentKey: null, index: 1, node: { type: 'thematicBreak' } },
         ], { origin: 'command' });
-        const { state: next, inverse } = applyTransaction(state, tr);
+        const { state: next, inverse } = applyTr(state, tr);
         expect(inverse.map((s) => s.type)).toEqual(['removeBlock', 'replaceInline']);
         let back = next;
-        for (const s of inverse) back = applyTransaction(back, transaction([s], { origin: 'history' })).state;
+        for (const s of inverse) back = applyTr(back, transaction([s], { origin: 'history' })).state;
         expect(toMarkdown(back.doc)).toBe('ab\n');
     });
 
     it('drops a text selection whose block vanished and keeps one that survived', () => {
         const doc = parseMarkdown('a\n\nb');
-        expect(mapSelection(textSelection('b-1', 1), [{ type: 'removeBlock', parentKey: null, index: 1 }], parseMarkdown('a'))).toBeNull();
-        expect(mapSelection(textSelection('b-0', 1), [{ type: 'removeBlock', parentKey: null, index: 1 }], parseMarkdown('a'))).toEqual(textSelection('b-0', 1));
-        expect(mapSelection(textSelection('b-0', 1), [{ type: 'setInline', key: 'b-0', flat: { text: '', spans: [] } }], doc)).toEqual(textSelection('b-0', 0));
-        expect(mapSelection({ mode: 'block', anchorKey: 'b-0', headKey: 'b-1' }, [{ type: 'setAttrs', key: 'b-0', attrs: {} }], doc)).toEqual({ mode: 'block', anchorKey: 'b-0', headKey: 'b-1' });
+        expect(mapSelection(textSelection('b-1', 1), [{ type: 'removeBlock', parentKey: null, index: 1 }], parseMarkdown('a'), markdownSchema)).toBeNull();
+        expect(mapSelection(textSelection('b-0', 1), [{ type: 'removeBlock', parentKey: null, index: 1 }], parseMarkdown('a'), markdownSchema)).toEqual(textSelection('b-0', 1));
+        expect(mapSelection(textSelection('b-0', 1), [{ type: 'setInline', key: 'b-0', flat: { text: '', spans: [] } }], doc, markdownSchema)).toEqual(textSelection('b-0', 0));
+        expect(mapSelection({ mode: 'block', anchorKey: 'b-0', headKey: 'b-1' }, [{ type: 'setAttrs', key: 'b-0', attrs: {} }], doc, markdownSchema)).toEqual({ mode: 'block', anchorKey: 'b-0', headKey: 'b-1' });
     });
 });
 
 describe('history', () => {
     function run(state: EditorState, history: ReturnType<typeof createHistory>, tr: Transaction): EditorState {
-        const { state: next, inverse } = applyTransaction(state, tr);
+        const { state: next, inverse } = applyTr(state, tr);
         if (tr.meta.addToHistory !== false) history.record(tr, inverse, state.selection, next.selection);
         return next;
     }
     function undo(state: EditorState, history: ReturnType<typeof createHistory>): EditorState {
         const entry = history.popUndo();
         if (!entry) return state;
-        return applyTransaction(state, transaction(entry.inverse, { origin: 'history', addToHistory: false }, { selection: entry.selectionBefore })).state;
+        return applyTr(state, transaction(entry.inverse, { origin: 'history', addToHistory: false }, { selection: entry.selectionBefore })).state;
     }
     function redo(state: EditorState, history: ReturnType<typeof createHistory>): EditorState {
         const entry = history.popRedo();
         if (!entry) return state;
-        return applyTransaction(state, transaction(entry.forward, { origin: 'history', addToHistory: false }, { selection: entry.selectionAfter })).state;
+        return applyTr(state, transaction(entry.forward, { origin: 'history', addToHistory: false }, { selection: entry.selectionAfter })).state;
     }
 
     it('merges consecutive typing in one block within the delay into one entry', () => {
         let t = 0;
         const history = createHistory({ now: () => t, groupDelayMs: 500 });
-        let state = createState(parseMarkdown('x'), textSelection('b-0', 1));
+        let state = createState(parseMarkdown('x'), textSelection('b-0', 1), markdownSchema);
         for (const ch of 'abc') {
             const sel = state.selection;
             state = run(state, history, insert('b-0', sel && sel.mode === 'text' ? sel.head.offset : 0, ch));
@@ -84,7 +88,7 @@ describe('history', () => {
     it('starts a new entry after the delay, on a different block, on a structural step, or after closeGroup', () => {
         let t = 0;
         const history = createHistory({ now: () => t, groupDelayMs: 500 });
-        let state = createState(parseMarkdown('x\n\ny'), textSelection('b-0', 1));
+        let state = createState(parseMarkdown('x\n\ny'), textSelection('b-0', 1), markdownSchema);
         state = run(state, history, insert('b-0', 1, 'a'));
         t += 1000;
         state = run(state, history, insert('b-0', 2, 'b'));
@@ -104,7 +108,7 @@ describe('history', () => {
 
     it('clears redo on a new entry and caps depth', () => {
         const history = createHistory({ depth: 2, now: () => 0 });
-        let state = createState(parseMarkdown('x'), null);
+        let state = createState(parseMarkdown('x'), null, markdownSchema);
         state = run(state, history, insert('b-0', 1, 'a', { group: undefined }));
         state = run(state, history, insert('b-0', 2, 'b', { group: undefined }));
         state = run(state, history, insert('b-0', 3, 'c', { group: undefined }));
@@ -119,7 +123,7 @@ describe('history', () => {
     it('keeps an IME composition as one open group regardless of time', () => {
         let t = 0;
         const history = createHistory({ now: () => t });
-        let state = createState(parseMarkdown('x'), textSelection('b-0', 1));
+        let state = createState(parseMarkdown('x'), textSelection('b-0', 1), markdownSchema);
         state = run(state, history, insert('b-0', 1, 'ｋ', { group: 'ime', composing: true }));
         t += 5000;
         state = run(state, history, transaction([{ type: 'setInline', key: 'b-0', flat: { text: 'xか', spans: [] } }], { origin: 'surface', sourceKey: 'b-0', group: 'ime', composing: true }));
@@ -133,7 +137,7 @@ describe('history', () => {
 
     it('exposes an input-rule entry for undoInputRule and never merges into it', () => {
         const history = createHistory({ now: () => 0 });
-        let state = createState(parseMarkdown('# h'), textSelection('b-0', 1));
+        let state = createState(parseMarkdown('# h'), textSelection('b-0', 1), markdownSchema);
         state = run(state, history, transaction([{ type: 'replaceBlock', key: 'b-0', node: { type: 'heading', depth: 1, children: [{ type: 'text', value: 'h' }] } }], { origin: 'inputRule', inputRule: 'heading', group: 'typing' }));
         expect(history.peekInputRule()?.inputRule).toBe('heading');
         state = run(state, history, insert('b-0', 1, 'i'));
@@ -145,14 +149,14 @@ describe('history', () => {
     it('peekInputRule is null once the group is closed or the entry was undone and redone', () => {
         const rule = () => transaction([{ type: 'replaceBlock', key: 'b-0', node: { type: 'heading', depth: 1, children: [{ type: 'text', value: 'h' }] } }], { origin: 'inputRule', inputRule: 'heading', group: 'typing' });
         let history = createHistory({ now: () => 0 });
-        let state = createState(parseMarkdown('# h'), textSelection('b-0', 1));
+        let state = createState(parseMarkdown('# h'), textSelection('b-0', 1), markdownSchema);
         run(state, history, rule());
         expect(history.peekInputRule()?.inputRule).toBe('heading');
         history.closeGroup();
         expect(history.peekInputRule()).toBeNull();
 
         history = createHistory({ now: () => 0 });
-        state = createState(parseMarkdown('# h'), textSelection('b-0', 1));
+        state = createState(parseMarkdown('# h'), textSelection('b-0', 1), markdownSchema);
         state = run(state, history, rule());
         state = undo(state, history);
         expect(history.peekInputRule()).toBeNull();

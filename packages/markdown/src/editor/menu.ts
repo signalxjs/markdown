@@ -5,19 +5,19 @@
  */
 
 import { insertBlockAfter, setBlockType, toggleList, wrapInBlockquote, type Command } from './commands.js';
-import type { BlockEditorSpec } from './schema.js';
+import type { NodeSpec } from '../schema/index.js';
 
-/** The command a menu entry runs: inline/code kinds convert the block in place, lists and quotes wrap it, everything else inserts after it (replacing an empty paragraph). */
-export function turnIntoCommand(spec: BlockEditorSpec): Command {
+/** The command a menu entry runs: text and code blocks convert the block in place, lists and quotes wrap it, everything else inserts after it (replacing an empty paragraph). */
+export function turnIntoCommand(spec: NodeSpec): Command {
     const created = spec.menu ? spec.menu.create() : { type: spec.type };
-    if (spec.kind === 'inline' && spec.fromInline) {
+    if (spec.role === 'textblock' && spec.fromInline) {
         const attrs: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(created)) if (k !== 'type' && k !== 'children') attrs[k] = v;
         return setBlockType(spec.type, attrs);
     }
     if (spec.type === 'list') return toggleList((created as { ordered?: boolean; children?: { checked?: boolean | null }[] }).ordered ? 'ordered' : 'bullet');
     if (spec.type === 'blockquote') return wrapInBlockquote;
-    if (spec.kind === 'code' && spec.fromInline) return setBlockType(spec.type, { lang: (created as { lang?: string | null }).lang ?? null });
+    if (spec.role === 'code' && spec.fromInline) return setBlockType(spec.type, { lang: (created as { lang?: string | null }).lang ?? null });
     return insertBlockAfter(created as Parameters<typeof insertBlockAfter>[0]);
 }
 

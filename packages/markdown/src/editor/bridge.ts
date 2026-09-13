@@ -16,6 +16,7 @@
  */
 
 import type { InlineFlat } from './inline-flat.js';
+import type { Schema } from '../schema/index.js';
 import { flatEquals } from './inline-flat.js';
 import type { EditorSelection, TextSelection } from './state.js';
 import { textSelection } from './state.js';
@@ -25,6 +26,8 @@ import type { CodeSurfaceEvents, InlineSurfaceEvents, Range, SurfaceChangeEvent 
 
 /** What the bridge needs from the editor. */
 export interface BridgeHost {
+    /** The document schema (marks vs atoms, for comparing flat models). */
+    schema: Schema;
     dispatch(tr: Transaction): void;
     /** Run the keymap binding for a boundary key against the current state; returns whether something handled it. */
     runKey(name: string): boolean;
@@ -40,8 +43,8 @@ export interface BridgeHost {
 }
 
 /** Compute the minimal `replaceInline` between two flat models (common prefix/suffix on the text; spans from the new model). */
-export function diffFlat(prev: InlineFlat, next: InlineFlat): { from: number; to: number; insert: InlineFlat } | null {
-    if (flatEquals(prev, next)) return null;
+export function diffFlat(prev: InlineFlat, next: InlineFlat, schema?: Schema): { from: number; to: number; insert: InlineFlat } | null {
+    if (flatEquals(prev, next, schema)) return null;
     const a = prev.text;
     const b = next.text;
     let start = 0;
@@ -89,7 +92,7 @@ export function createInlineBridge(key: string, host: BridgeHost): InlineBridge 
         if (e.replaced && replacedMatches(prev, e.replaced, e.flat)) {
             steps = [{ type: 'replaceInline', key, from: e.replaced.from, to: e.replaced.to, slice: e.replaced.insert }];
         } else {
-            const d = diffFlat(prev, e.flat);
+            const d = diffFlat(prev, e.flat, host.schema);
             if (!d) {
                 if (e.selection) host.setSelection(selection);
                 return;

@@ -1,88 +1,63 @@
 /**
  * `InlineFlat` — the flat inline model the editor core and its surfaces speak.
  *
- * An inline container (paragraph, heading, table cell) is edited as a run of
- * text plus a set of ranged marks and atoms, because that is what every real
- * text surface is: a DOM `contenteditable`, a native attributed string, a
- * terminal buffer. The tree form (`PhrasingContent[]`) is the document's
- * truth; this module converts losslessly in both directions:
+ * A text block (paragraph, heading, table cell) is edited as a run of text
+ * plus a set of ranged marks and atoms, because that is what every real text
+ * surface is: a DOM `contenteditable`, a native attributed string, a terminal
+ * buffer. The tree form (`PhrasingContent[]`) is the document's truth; this
+ * module converts losslessly in both directions, driven by the schema's
+ * inline specs:
  *
- *  - marks (`strong`, `emphasis`, `delete`, `inlineCode`, `link`, plugin
- *    marks) are `{ start, end }` ranges in UTF-16 code units, and may overlap
- *    freely — `toInline()` re-nests them by extent (the ProseMirror
- *    serializer trick) so the tree is always properly nested;
- *  - atoms (`image`, plugin atoms such as `mention`) occupy exactly one
- *    U+FFFC (object replacement character) and carry their node in `attrs`;
- *  - a hard break is a `\n` in the text (paragraphs only; `toInline` turns it
- *    into a `break` node).
+ *  - marks (role `mark`) are `{ start, end }` ranges in UTF-16 code units,
+ *    and may overlap freely — `toInline()` re-nests them by extent (the
+ *    ProseMirror serializer trick) so the tree is always properly nested;
+ *  - a literal mark (`inline.literal`, e.g. inline code) carries its own
+ *    `value`; nothing nests inside it except `wrapsLiteral` marks;
+ *  - atoms (role `atom`) occupy exactly one U+FFFC (object replacement
+ *    character) and carry their node in `attrs`;
+ *  - a hard break (`inline.kind === 'break'`) is a `\n` in the text.
+ *
+ * A type the schema does not know is a mark when the node has children and
+ * an atom otherwise, and a span of such a type is an atom only when it covers
+ * exactly one U+FFFC — so an unregistered plugin node still round-trips.
  *
  * `flatEquals()` is the echo guard: a surface pushing back exactly what it
  * was given is a no-op transaction.
  */
 
 import type { Node, PhrasingContent } from '../ast/index.js';
+import type { InlineFlat, InlineSpan, Schema } from '../schema/index.js';
+import { ATOM_CHAR, inlineAttrsOf, phrasingText } from '../schema/index.js';
 
-export const ATOM_CHAR = '￼';
+export type { InlineFlat, InlineSpan } from '../schema/index.js';
+export { ATOM_CHAR } from '../schema/index.js';
 
-export interface InlineSpan {
-    /** Inclusive start, UTF-16 code units. */
-    start: number;
-    /** Exclusive end. */
-    end: number;
-    /** Mark or atom type: an mdast phrasing type or a plugin node type. */
-    type: string;
-    /** Type-specific payload: `url`/`title` for links, `url`/`alt`/`title` for images, plugin fields. */
-    attrs?: Record<string, string>;
-}
+type Kind = 'text' | 'break' | 'mark' | 'literal' | 'atom';
 
-export interface InlineFlat {
-    text: string;
-    spans: InlineSpan[];
-}
-
-/** How a plugin inline node type maps onto the flat model. */
-export interface InlineKindSpec {
-    type: string;
-    kind: 'mark' | 'atom';
-    /** Atom: build the node back from its attrs. Mark: build the wrapper (children filled by the converter). */
-    fromFlat?: (span: InlineSpan, children: PhrasingContent[]) => PhrasingContent;
-    /** Extract the attrs a node carries (default: every string-valued own property except `type`, `children`, `position`). */
-    toFlat?: (node: PhrasingContent) => Record<string, string>;
-}
-
-export interface InlineFlatOptions {
-    /** Plugin inline node kinds. Unknown node types with `children` are treated as marks, leaf types as atoms. */
-    kinds?: ReadonlyMap<string, InlineKindSpec>;
-}
-
-const BUILTIN_MARKS = new Set(['strong', 'emphasis', 'delete', 'inlineCode', 'link']);
-const BUILTIN_ATOMS = new Set(['image', 'imageReference', 'linkReference']);
-
-/** Outer-to-inner nesting priority when extents tie (lower sits outermost). */
-const PRIORITY: Record<string, number> = { link: 0, inlineCode: 1, strong: 2, emphasis: 3, delete: 4 };
-function priority(type: string): number {
-    return PRIORITY[type] ?? 99;
-}
-
-function kindOf(node: PhrasingContent, opts?: InlineFlatOptions): 'mark' | 'atom' | 'text' | 'break' | 'code' {
-    if (node.type === 'text') return 'text';
-    if (node.type === 'break') return 'break';
-    if (node.type === 'inlineCode') return 'code';
-    if (BUILTIN_MARKS.has(node.type)) return 'mark';
-    if (BUILTIN_ATOMS.has(node.type)) return 'atom';
-    const spec = opts?.kinds?.get(node.type);
-    if (spec) return spec.kind;
+function kindOf(node: PhrasingContent, schema: Schema): Kind {
+    const spec = schema.get(node.type);
+    if (spec) {
+        if (spec.role === 'inline') return spec.inline?.kind === 'break' ? 'break' : 'text';
+        if (spec.role === 'mark') return spec.inline?.literal ? 'literal' : 'mark';
+        if (spec.role === 'atom') return 'atom';
+    }
     return Array.isArray((node as { children?: unknown }).children) ? 'mark' : 'atom';
 }
 
-function defaultAttrs(node: PhrasingContent): Record<string, string> {
-    const attrs: Record<string, string> = {};
-    for (const [k, v] of Object.entries(node as unknown as Record<string, unknown>)) {
-        if (k === 'type' || k === 'children' || k === 'position' || k === 'data' || k === 'key') continue;
-        if (typeof v === 'string') attrs[k] = v;
-        else if (typeof v === 'number' || typeof v === 'boolean') attrs[k] = String(v);
-    }
-    return attrs;
+function isLiteral(type: string, schema: Schema): boolean {
+    return schema.get(type)?.inline?.literal === true;
+}
+
+function wrapsLiteral(type: string, schema: Schema): boolean {
+    return schema.get(type)?.inline?.wrapsLiteral === true;
+}
+
+function priority(type: string, schema: Schema): number {
+    return schema.get(type)?.inline?.priority ?? 99;
+}
+
+function attrsOf(node: PhrasingContent, schema: Schema): Record<string, string> {
+    return (schema.get(node.type)?.inline?.toFlat ?? inlineAttrsOf)(node);
 }
 
 // ---------------------------------------------------------------------------
@@ -90,31 +65,33 @@ function defaultAttrs(node: PhrasingContent): Record<string, string> {
 // ---------------------------------------------------------------------------
 
 /** Flatten phrasing content into text + spans. */
-export function toFlat(nodes: readonly PhrasingContent[], opts?: InlineFlatOptions): InlineFlat {
+export function toFlat(nodes: readonly PhrasingContent[], schema: Schema): InlineFlat {
     let text = '';
     const spans: InlineSpan[] = [];
 
     const walk = (list: readonly PhrasingContent[]): void => {
         for (const node of list) {
-            switch (kindOf(node, opts)) {
+            switch (kindOf(node, schema)) {
                 case 'text':
                     text += (node as { value: string }).value;
                     break;
                 case 'break':
                     text += '\n';
                     break;
-                case 'code': {
-                    const start = text.length;
+                case 'literal': {
+                    const span: InlineSpan = { start: text.length, end: text.length, type: node.type };
                     text += (node as { value: string }).value;
-                    spans.push({ start, end: text.length, type: 'inlineCode' });
+                    span.end = text.length;
+                    const attrs = attrsOf(node, schema);
+                    if (Object.keys(attrs).length) span.attrs = attrs;
+                    spans.push(span);
                     break;
                 }
                 case 'mark': {
                     // Pushed BEFORE the children so insertion order records the
                     // nesting (outer first); `toInline` uses it to break extent ties.
                     const span: InlineSpan = { start: text.length, end: text.length, type: node.type };
-                    const attrs = (opts?.kinds?.get(node.type)?.toFlat ?? defaultAttrs)(node);
-                    if (node.type === 'link' && (node as { data?: { autolink?: boolean } }).data?.autolink) attrs.autolink = 'true';
+                    const attrs = attrsOf(node, schema);
                     if (Object.keys(attrs).length) span.attrs = attrs;
                     spans.push(span);
                     walk((node as { children: PhrasingContent[] }).children);
@@ -124,28 +101,26 @@ export function toFlat(nodes: readonly PhrasingContent[], opts?: InlineFlatOptio
                 case 'atom': {
                     const start = text.length;
                     text += ATOM_CHAR;
-                    const attrs = (opts?.kinds?.get(node.type)?.toFlat ?? defaultAttrs)(node);
-                    // Reference-style nodes keep their label text as `alt`/`label` attrs already.
-                    if (node.type === 'linkReference') attrs.text = plainText((node as { children: PhrasingContent[] }).children);
-                    spans.push({ start, end: start + 1, type: node.type, attrs });
+                    spans.push({ start, end: start + 1, type: node.type, attrs: attrsOf(node, schema) });
                     break;
                 }
             }
         }
     };
     walk(nodes);
-    return { text, spans: mergeAdjacent(normalizeSpans(spans), text) };
+    return { text, spans: mergeAdjacent(normalizeSpans(spans), text, schema) };
 }
 
 /**
  * Merge touching or overlapping marks of the same type and attrs — the
  * canonical form, so `strong(a) emphasis(strong(bc) d)` and
- * `strong(a b c) emphasis(b c d)` compare equal. Atoms never merge.
+ * `strong(a b c) emphasis(b c d)` compare equal. Atoms never merge. Without
+ * a schema, any one-character span over U+FFFC counts as an atom.
  */
-export function mergeAdjacent(spans: readonly InlineSpan[], text: string): InlineSpan[] {
+export function mergeAdjacent(spans: readonly InlineSpan[], text: string, schema?: Schema): InlineSpan[] {
     const out: InlineSpan[] = [];
     for (const s of normalizeSpans(spans)) {
-        const prev = looksLikeAtom(s, text) ? undefined : out.find((p) => p.type === s.type && p.end >= s.start && sameAttrs(p.attrs, s.attrs) && !looksLikeAtom(p, text));
+        const prev = looksLikeAtom(s, text, schema) ? undefined : out.find((p) => p.type === s.type && p.end >= s.start && sameAttrs(p.attrs, s.attrs) && !looksLikeAtom(p, text, schema));
         if (prev) {
             prev.end = Math.max(prev.end, s.end);
             continue;
@@ -153,15 +128,6 @@ export function mergeAdjacent(spans: readonly InlineSpan[], text: string): Inlin
         out.push({ ...s });
     }
     return normalizeSpans(out);
-}
-
-function plainText(nodes: readonly PhrasingContent[]): string {
-    let out = '';
-    for (const n of nodes) {
-        if ('value' in n && typeof (n as { value: unknown }).value === 'string') out += (n as { value: string }).value;
-        else if (Array.isArray((n as { children?: unknown }).children)) out += plainText((n as { children: PhrasingContent[] }).children);
-    }
-    return out;
 }
 
 /**
@@ -180,11 +146,11 @@ export function normalizeSpans(spans: readonly InlineSpan[]): InlineSpan[] {
 // ---------------------------------------------------------------------------
 
 /** Rebuild properly nested phrasing content from a flat model. */
-export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingContent[] {
+export function toInline(flat: InlineFlat, schema: Schema): PhrasingContent[] {
     const { text } = flat;
     const spans = normalizeSpans(flat.spans);
-    const atoms = spans.filter((s) => isAtomSpan(s, opts));
-    const marks = spans.filter((s) => !isAtomSpan(s, opts));
+    const atoms = spans.filter((s) => isAtomSpan(s, text, schema));
+    const marks = spans.filter((s) => !isAtomSpan(s, text, schema));
 
     // Boundaries: every span edge, every atom, every hard break.
     const points = new Set<number>([0, text.length]);
@@ -211,8 +177,8 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
         const b = sorted[i + 1];
         if (b <= a) continue;
         let active = marks.filter((s) => s.start <= a && s.end >= b);
-        // Inside code, nothing else applies except an enclosing link.
-        if (active.some((s) => s.type === 'inlineCode')) active = active.filter((s) => s.type === 'inlineCode' || s.type === 'link');
+        // Inside a literal, nothing else applies except a mark that may wrap it.
+        if (active.some((s) => isLiteral(s.type, schema))) active = active.filter((s) => isLiteral(s.type, schema) || wrapsLiteral(s.type, schema));
         runs.push({ start: a, end: b, active });
     }
 
@@ -232,15 +198,9 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
     const stack: { span: InlineSpan; children: PhrasingContent[] }[] = [];
     const top = (): PhrasingContent[] => (stack.length ? stack[stack.length - 1].children : root);
     const build = (span: InlineSpan, children: PhrasingContent[]): PhrasingContent => {
-        const spec = opts?.kinds?.get(span.type);
-        if (spec?.fromFlat) return spec.fromFlat(span, children);
-        if (span.type === 'inlineCode') return { type: 'inlineCode', value: plainText(children) };
-        if (span.type === 'link') {
-            const node: PhrasingContent = { type: 'link', url: span.attrs?.url ?? '', children };
-            if (span.attrs?.title !== undefined) (node as { title?: string }).title = span.attrs.title;
-            if (span.attrs?.autolink === 'true') (node as { data?: { autolink: boolean } }).data = { autolink: true };
-            return node;
-        }
+        const spec = schema.get(span.type);
+        if (spec?.inline?.fromFlat) return spec.inline.fromFlat(span, children);
+        if (spec?.inline?.literal) return { type: span.type, ...span.attrs, value: phrasingText(children) } as unknown as PhrasingContent;
         return { type: span.type, ...span.attrs, children } as unknown as PhrasingContent;
     };
     const closeTo = (keep: number): void => {
@@ -256,11 +216,11 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
             const ex = contEnd[i].get(x) ?? run.end;
             const ey = contEnd[i].get(y) ?? run.end;
             if (ey !== ex) return ey - ex;
-            // Code is terminal: it always sits innermost, whatever the recorded nesting.
-            const xCode = x.type === 'inlineCode';
-            const yCode = y.type === 'inlineCode';
-            if (xCode !== yCode) return xCode ? 1 : -1;
-            return marks.indexOf(x) - marks.indexOf(y) || priority(x.type) - priority(y.type);
+            // A literal is terminal: it always sits innermost, whatever the recorded nesting.
+            const xLit = isLiteral(x.type, schema);
+            const yLit = isLiteral(y.type, schema);
+            if (xLit !== yLit) return xLit ? 1 : -1;
+            return marks.indexOf(x) - marks.indexOf(y) || priority(x.type, schema) - priority(y.type, schema);
         });
         let keep = 0;
         while (keep < stack.length && keep < desired.length && stack[keep].span === desired[keep]) keep++;
@@ -269,7 +229,7 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
 
         const atom = atoms.find((s) => s.start === run.start && s.end === run.end);
         if (atom) {
-            top().push(atomNode(atom, opts));
+            top().push(atomNode(atom, schema));
             continue;
         }
         const slice = text.slice(run.start, run.end);
@@ -283,46 +243,23 @@ export function toInline(flat: InlineFlat, opts?: InlineFlatOptions): PhrasingCo
     return root;
 }
 
-/** Without a kind registry: a one-char span over U+FFFC is an atom unless its type is a built-in mark (a mark may cover exactly one atom). */
-function looksLikeAtom(span: InlineSpan, text: string): boolean {
-    return span.end - span.start === 1 && text[span.start] === ATOM_CHAR && !BUILTIN_MARKS.has(span.type);
+/** A one-char span over U+FFFC is an atom unless the schema says its type is a mark (a mark may cover exactly one atom). */
+function looksLikeAtom(span: InlineSpan, text: string, schema?: Schema): boolean {
+    return span.end - span.start === 1 && text[span.start] === ATOM_CHAR && schema?.role(span.type) !== 'mark';
 }
 
-function isAtomSpan(span: InlineSpan, opts?: InlineFlatOptions): boolean {
-    if (BUILTIN_ATOMS.has(span.type)) return true;
-    const spec = opts?.kinds?.get(span.type);
-    if (spec) return spec.kind === 'atom';
-    return span.end - span.start === 1 && !BUILTIN_MARKS.has(span.type);
+/** Atom by role; for a type the schema does not know, only a one-character span over U+FFFC (an unknown mark over a single letter stays a mark). */
+function isAtomSpan(span: InlineSpan, text: string, schema: Schema): boolean {
+    const role = schema.role(span.type);
+    if (role === 'atom') return true;
+    if (role === 'mark') return false;
+    return span.end - span.start === 1 && text[span.start] === ATOM_CHAR;
 }
 
-function atomNode(span: InlineSpan, opts?: InlineFlatOptions): PhrasingContent {
-    const spec = opts?.kinds?.get(span.type);
-    if (spec?.fromFlat) return spec.fromFlat(span, []);
-    const attrs = span.attrs ?? {};
-    if (span.type === 'image') {
-        const node: PhrasingContent = { type: 'image', url: attrs.url ?? '', alt: attrs.alt ?? '' };
-        if (attrs.title !== undefined) (node as { title?: string }).title = attrs.title;
-        return node;
-    }
-    if (span.type === 'linkReference') {
-        return {
-            type: 'linkReference',
-            identifier: attrs.identifier ?? '',
-            label: attrs.label ?? attrs.identifier ?? '',
-            referenceType: (attrs.referenceType as 'shortcut' | 'collapsed' | 'full') ?? 'shortcut',
-            children: [{ type: 'text', value: attrs.text ?? attrs.label ?? '' }],
-        };
-    }
-    if (span.type === 'imageReference') {
-        return {
-            type: 'imageReference',
-            identifier: attrs.identifier ?? '',
-            label: attrs.label ?? attrs.identifier ?? '',
-            referenceType: (attrs.referenceType as 'shortcut' | 'collapsed' | 'full') ?? 'shortcut',
-            alt: attrs.alt ?? '',
-        };
-    }
-    return { type: span.type, ...attrs } as unknown as PhrasingContent;
+function atomNode(span: InlineSpan, schema: Schema): PhrasingContent {
+    const fromFlat = schema.get(span.type)?.inline?.fromFlat;
+    if (fromFlat) return fromFlat(span, []);
+    return { type: span.type, ...span.attrs } as unknown as PhrasingContent;
 }
 
 function pushText(list: PhrasingContent[], value: string): void {
@@ -340,12 +277,12 @@ function pushText(list: PhrasingContent[], value: string): void {
 // ---------------------------------------------------------------------------
 
 /** Structural equality of two flat models (text and normalised spans). */
-export function flatEquals(a: InlineFlat, b: InlineFlat): boolean {
+export function flatEquals(a: InlineFlat, b: InlineFlat, schema?: Schema): boolean {
     if (a === b) return true;
     if (a.text !== b.text) return false;
     const byType = (x: InlineSpan, y: InlineSpan) => x.start - y.start || y.end - x.end || x.type.localeCompare(y.type);
-    const sa = mergeAdjacent(a.spans, a.text).sort(byType);
-    const sb = mergeAdjacent(b.spans, b.text).sort(byType);
+    const sa = mergeAdjacent(a.spans, a.text, schema).sort(byType);
+    const sb = mergeAdjacent(b.spans, b.text, schema).sort(byType);
     if (sa.length !== sb.length) return false;
     for (let i = 0; i < sa.length; i++) {
         const x = sa[i];
@@ -369,7 +306,7 @@ export function flatEquals(a: InlineFlat, b: InlineFlat): boolean {
  * see `marksAt`). Atoms inside the range are removed. The inverse is the
  * same splice with the removed text and its clipped spans (`sliceFlat`).
  */
-export function spliceFlat(flat: InlineFlat, from: number, to: number, slice: InlineFlat): InlineFlat {
+export function spliceFlat(flat: InlineFlat, from: number, to: number, slice: InlineFlat, schema?: Schema): InlineFlat {
     const delta = slice.text.length - (to - from);
     const text = flat.text.slice(0, from) + slice.text + flat.text.slice(to);
     const spans: InlineSpan[] = [];
@@ -388,7 +325,7 @@ export function spliceFlat(flat: InlineFlat, from: number, to: number, slice: In
         // else: inside the range (incl. atoms) — dropped.
     }
     for (const s of slice.spans) spans.push({ ...s, start: s.start + from, end: s.end + from });
-    return { text, spans: mergeAdjacent(spans, text) };
+    return { text, spans: mergeAdjacent(spans, text, schema) };
 }
 
 /** Slice `[from, to)` out as its own flat model (spans clipped and re-based). */
@@ -413,10 +350,10 @@ export function concatFlat(a: InlineFlat, b: InlineFlat): InlineFlat {
 }
 
 /** The marks active at a collapsed caret (a mark covering `[offset-1, offset]`, or wrapping the range). */
-export function marksAt(flat: InlineFlat, start: number, end = start): string[] {
+export function marksAt(flat: InlineFlat, start: number, end = start, schema?: Schema): string[] {
     const types = new Set<string>();
     for (const s of flat.spans) {
-        if (looksLikeAtom(s, flat.text)) continue;
+        if (looksLikeAtom(s, flat.text, schema)) continue;
         const covers = start === end ? s.start < start && s.end >= start : s.start <= start && s.end >= end;
         if (covers) types.add(s.type);
     }
@@ -466,7 +403,8 @@ function sameAttrs(a?: Record<string, string>, b?: Record<string, string>): bool
     return ka.every((k) => a![k] === b![k]);
 }
 
-/** Whether a node type is inline content the flat model can hold. */
-export function isPhrasingNode(node: Node): boolean {
-    return node.type === 'text' || node.type === 'break' || BUILTIN_MARKS.has(node.type) || BUILTIN_ATOMS.has(node.type);
+/** Whether a node is phrasing content the flat model can hold (an `inline`, `mark` or `atom` role). */
+export function isPhrasingNode(node: Node, schema: Schema): boolean {
+    const role = schema.role(node.type);
+    return role === 'inline' || role === 'mark' || role === 'atom';
 }

@@ -10,7 +10,7 @@ import type { BlockContent } from '../ast/index.js';
 import { insertBlockAfter, type Command } from './commands.js';
 import { filterMenu, turnIntoCommand } from './menu.js';
 import type { EditorPlugin } from './plugin.js';
-import { builtinBlockEditors, type BlockEditorSpec, type BlockMenuEntry } from './schema.js';
+import { standardNodes, type BlockMenuEntry, type NodeSpec } from '../schema/index.js';
 import type { TriggerItem, TriggerSpec } from './trigger/index.js';
 
 /** A custom slash entry: `run` a command, or let `create()` build the block that is inserted (replacing an empty paragraph). */
@@ -23,8 +23,8 @@ export interface SlashItem extends BlockMenuEntry {
 export interface SlashPluginOptions {
     /** Trigger character. Default `/`. */
     trigger?: string;
-    /** Block editor specs whose menu entries appear (default: the built-ins). Pass the plugin specs too when using plugin blocks. */
-    blockEditors?: readonly BlockEditorSpec[];
+    /** Node specs whose menu entries appear (default: the standard vocabulary). Pass the plugin specs too when using plugin blocks. */
+    nodes?: readonly NodeSpec[];
     /** Extra items appended after the block types. */
     items?: readonly SlashItem[];
     /** Hide some built-in entries by block type. */
@@ -32,7 +32,7 @@ export interface SlashPluginOptions {
 }
 
 interface SlashTriggerItem extends TriggerItem {
-    spec?: BlockEditorSpec;
+    spec?: NodeSpec;
     run?: Command;
     create?: () => BlockContent;
     keywords?: readonly string[];
@@ -42,7 +42,7 @@ interface SlashTriggerItem extends TriggerItem {
 
 export function createSlashPlugin(options: SlashPluginOptions = {}): EditorPlugin {
     const exclude = new Set(options.exclude ?? []);
-    const specs = [...builtinBlockEditors, ...(options.blockEditors ?? [])].filter((s) => s.menu && !exclude.has(s.type));
+    const specs = (options.nodes ?? standardNodes).filter((s) => s.menu && !exclude.has(s.type));
     const entries: SlashTriggerItem[] = [
         ...specs.map((spec) => ({ id: `block:${spec.type}`, label: spec.menu!.label, keywords: spec.menu!.keywords, icon: spec.menu!.icon, group: spec.menu!.group, spec })),
         ...(options.items ?? []).map((item) => ({ id: item.id, label: item.label, keywords: item.keywords, icon: item.icon, group: item.group, run: item.run, create: item.create })),

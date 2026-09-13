@@ -52,7 +52,7 @@ import type {
     Table,
     TableRow,
 } from '../ast/index.js';
-import { collectDefinitions } from '../ast/index.js';
+import { collectDefinitions } from '../document/index.js';
 
 export interface ToHtmlOptions {
     /** Definitions to resolve references against; defaults to `collectDefinitions(root)`. */

@@ -66,7 +66,7 @@ export function createFakeInlineSurface(init: InlineSurfaceInit): FakeInlineSurf
         },
         setInline(next, opts) {
             record('setInline', next, opts);
-            if (flatEquals(flat, next)) return;
+            if (flatEquals(flat, next, init.schema)) return;
             flat = next;
             if (selection) selection = { start: Math.min(selection.start, flat.text.length), end: Math.min(selection.end, flat.text.length) };
         },

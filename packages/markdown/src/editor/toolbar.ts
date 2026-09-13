@@ -91,9 +91,9 @@ function activeMarksOf(state: EditorState, ctx: CommandContext): string[] {
     const sel = state.selection;
     if (!sel || sel.mode !== 'text') return [];
     const entry = state.index().get(sel.anchor.key);
-    if (!entry || ctx.schema.kind(entry.node.type) !== 'inline') return [];
+    if (!entry || ctx.schema.role(entry.node.type) !== 'textblock') return [];
     const { from, to } = selectionRange(sel);
-    return marksAt(flatOf(entry.node, { inline: ctx.inline }), from, to);
+    return marksAt(flatOf(entry.node, ctx), from, to, ctx.schema);
 }
 
 /** Derive the toolbar's view of the editor from the selection. */

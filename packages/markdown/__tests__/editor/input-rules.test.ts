@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseMarkdown } from '../../src/parser/index.js';
 import { toMarkdown } from '../../src/serializer/index.js';
-import { createSchema } from '../../src/editor/schema.js';
+import { markdownSchema } from '../../src/schema/index.js';
 import { createState, textSelection } from '../../src/editor/state.js';
 import type { EditorSelection, EditorState } from '../../src/editor/state.js';
 import type { BlockContent, Root } from '../../src/ast/index.js';
@@ -13,7 +13,7 @@ import { applyEnterRules, applyInputRules, baseInputRules, enterInputRules, isIn
 import type { InputRule } from '../../src/editor/input-rules.js';
 import { createHistory } from '../../src/editor/history.js';
 
-const schema = createSchema();
+const schema = markdownSchema;
 const ctx: CommandContext = { schema, parse: (md) => parseMarkdown(md) };
 
 const doc = (...children: BlockContent[]): Root => ({ type: 'root', children });
@@ -21,11 +21,11 @@ const doc = (...children: BlockContent[]): Root => ({ type: 'root', children });
 const p = (text: string): BlockContent => ({ type: 'paragraph', children: text ? [{ type: 'text', value: text }] : [] });
 
 function stateOf(md: string | Root, selection: EditorSelection): EditorState {
-    return createState(typeof md === 'string' ? parseMarkdown(md) : md, selection, { editableTypes: schema.editableTypes });
+    return createState(typeof md === 'string' ? parseMarkdown(md) : md, selection, schema);
 }
 
 function apply(state: EditorState, tr: Transaction): EditorState {
-    return applyTransaction(state, tr, {}, schema.editableTypes).state;
+    return applyTransaction(state, tr, ctx).state;
 }
 
 /**
@@ -93,9 +93,9 @@ describe('applyInputRules gating', () => {
         const r = type('', at('b-0', 0), '# ');
         expect(r.tr!.meta).toEqual({ origin: 'inputRule', inputRule: 'heading', group: 'typing' });
         const history = createHistory();
-        const typing = applyTransaction(r.afterTyping, r.typed, {}, schema.editableTypes);
+        const typing = applyTransaction(r.afterTyping, r.typed, ctx);
         history.record(r.typed, typing.inverse, null, r.afterTyping.selection);
-        const rule = applyTransaction(r.afterTyping, r.tr!, {}, schema.editableTypes);
+        const rule = applyTransaction(r.afterTyping, r.tr!, ctx);
         history.record(r.tr!, rule.inverse, r.afterTyping.selection, r.state.selection);
         expect(history.done).toHaveLength(2);
         expect(isInputRuleEntry(history.peekInputRule())).toBe(true);

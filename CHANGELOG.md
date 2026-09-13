@@ -6,6 +6,38 @@ workspace shares one version line.
 
 ## [Unreleased]
 
+### Changed
+
+- **Schema as data** (#20, phase 1 of #19). One `Schema` now says what every
+  node type is — `NodeSpec { type, role, … }` with roles `textblock`,
+  `container`, `table`, `code`, `void`, `inline`, `mark`, `atom` — and every
+  layer reads it instead of carrying its own list: key assignment, the
+  editor's block index, steps and transactions, the flat inline model, the
+  menus. `createSchema(specs)` implies nothing; `standardNodes` /
+  `standardSchema` are the mdast vocabulary the core owns, `markdownNodes` /
+  `markdownSchema` add what markdown needs (`html`, `definition`,
+  `linkReference`, `imageReference`). A plugin registers node types through
+  `MarkdownPlugin.nodes` (replaces `editor.blockEditors` + `editor.inline`);
+  its flat-model mapping lives on the spec (`inline: { literal, wrapsLiteral,
+  priority, toFlat, fromFlat }`).
+- Breaking, no aliases kept: `editor/schema.ts` (`BlockEditorSpec`,
+  `SurfaceKind`, `builtinBlockEditors`, the editor-local `createSchema`),
+  `EDITABLE_TYPES`, `isContainerType`, `InlineKindSpec`, `InlineFlatOptions`,
+  `mentionInlineKind` (now `mentionNode`) and `isKeyedType` are gone.
+  `Schema.kind()` is `Schema.role()` and the `'inline'` surface kind is the
+  `'textblock'` role. `toFlat` / `toInline` / `buildIndex` / `createState` /
+  `normalizeDoc` / `emptyDoc` take the schema; `StepContext` is `{ schema }`
+  and `applyTransaction` / `applyStep` / `invertStep` require it;
+  `mapSelection` takes the schema. `InlineSurfaceInit` and `BridgeHost` carry
+  `schema` so surfaces compare flat models exactly (`flatEquals`,
+  `mergeAdjacent`, `marksAt` and `diffFlat` accept it). `createSlashPlugin`
+  takes `nodes` instead of `blockEditors`; `EditorOptions.schema` overrides the
+  derived schema.
+- `toJSON` / `fromJSON` / `MarkdownFormatError` and `collectDefinitions` moved
+  from `ast/` to the new `document/` folder (`fromJSON(input, { schema })`,
+  `collectDefinitions(root, schema)`); `ast/` keeps only the node types,
+  positions, `topKey` / `childKey` and `visit`.
+
 ## [0.2.0] - 2026-09-12
 
 ### Added
