@@ -24,6 +24,8 @@
             "@sigx/richtext-markdown": ["../../packages/richtext-markdown/src/index.ts"],
             "@sigx/richtext-markdown/editor": ["../../packages/richtext-markdown/src/editor/index.ts"],
             "@sigx/richtext-markdown/testing": ["../../packages/richtext-markdown/src/testing/index.ts"],
+            "@sigx/richtext-html": ["../../packages/richtext-html/src/index.ts"],
+            "@sigx/richtext-html/editor": ["../../packages/richtext-html/src/editor/index.ts"],
             "@sigx/richtext-shiki": ["../../packages/richtext-shiki/src/index.ts"]
         }
     },

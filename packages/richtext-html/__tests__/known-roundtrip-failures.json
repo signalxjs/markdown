@@ -1,0 +1,5 @@
+{
+  "_comment": "Examples whose tree does not survive parseHtml(toHtml(tree)) — each a documented HTML semantic, not a bug: 127, 129 a fence whose value starts with a newline (HTML drops the newline after <pre>); 369–468 emphasis nested in the same emphasis (the parser flattens a mark inside itself); 484, 487 a link with no content (an empty anchor is dropped); 596–601 autolinks with a scheme sanitizeUrl refuses (irc:, a+b+c:, made-up schemes). The list can only shrink.",
+  "commonmark": [127, 129, 369, 373, 389, 407, 408, 409, 417, 425, 426, 427, 461, 463, 464, 465, 466, 468, 484, 487, 596, 598, 599, 601],
+  "gfm": []
+}

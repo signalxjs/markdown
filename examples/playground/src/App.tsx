@@ -11,6 +11,8 @@ import { createSlashPlugin } from '@sigx/richtext/editor';
 import { RichTextEditor, createDomMentionPlugin } from '@sigx/richtext/editor/dom';
 import { markdownFormat, mentionMarkdown, mentionPlugin, parseMarkdown, toMarkdown } from '@sigx/richtext-markdown';
 import { markdownPreset } from '@sigx/richtext-markdown/editor';
+import { htmlFormat, mentionHtml } from '@sigx/richtext-html';
+import { htmlPreset } from '@sigx/richtext-html/editor';
 
 // Register the mention node with the AST and type its component slot: this
 // is the consumer-side half of the plugin contract (the package does not do
@@ -87,12 +89,13 @@ const PEOPLE = [
     { id: 'u4', label: 'Dana' }
 ];
 
-/** The editor's plugins: the markdown preset (input rules, clipboard), the mention syntax + `@` trigger + chip, and `/` block commands. Captured at mount. */
+/** The editor's plugins: the markdown preset (input rules, clipboard), the HTML preset (`text/html` on copy), the mention syntax + `@` trigger + chip, and `/` block commands. Captured at mount. */
 const EDITOR_PLUGINS: readonly RichTextPlugin[] = [
     markdownPreset,
+    htmlPreset,
     createDomMentionPlugin({
         onQuery: (q) => PEOPLE.filter((p) => p.label.toLowerCase().startsWith(q.toLowerCase())),
-        formats: { markdown: mentionMarkdown }
+        formats: { markdown: mentionMarkdown, html: mentionHtml }
     }),
     createSlashPlugin()
 ];
@@ -292,6 +295,7 @@ export const App = component(({ signal, onUnmounted }) => {
                             <RichTextEditor
                                 id="editor"
                                 format={markdownFormat}
+                                formats={[htmlFormat]}
                                 model:source={[state, 'source']}
                                 plugins={EDITOR_PLUGINS}
                                 components={{ mention: MentionChip }}

@@ -38,6 +38,7 @@ const rootDir = join(__dirname, '..');
 const PACKAGES = [
     'packages/richtext',
     'packages/richtext-markdown',
+    'packages/richtext-html',
     'packages/richtext-shiki',
 ];
 

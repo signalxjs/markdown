@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@sigx/richtext": "workspace:*",
+    "@sigx/richtext-html": "workspace:*",
     "@sigx/richtext-markdown": "workspace:*",
     "@sigx/richtext-shiki": "workspace:*",
     "shiki": "^4.0.2",
