@@ -18,12 +18,6 @@
             "production": "./dist/editor.prod.js",
             "import": "./dist/editor.js"
         },
-        "./testing": {
-            "types": "./dist/testing/index.d.ts",
-            "development": "./dist/testing.js",
-            "production": "./dist/testing.prod.js",
-            "import": "./dist/testing.js"
-        },
         "./package.json": "./package.json"
     },
     "files": [

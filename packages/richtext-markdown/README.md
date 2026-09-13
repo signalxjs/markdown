@@ -5,14 +5,14 @@ keeps finalized blocks stable while a source string grows (built for
 token-by-token AI output), a serializer, `markdownFormat` (the
 `DocumentFormat` a view or editor reads and writes with), the node specs
 markdown adds to the standard vocabulary, the markdown syntax-extension
-contract plugins fill under `formats.markdown`, and the editor preset. Zero
+contract plugins fill under `formats.markdown`, and the editor preset (the
+CommonMark conformance suite renders through `@sigx/richtext-html`). Zero
 dependencies beyond `@sigx/richtext`, no `node:` imports.
 
 | Entry | What |
 |---|---|
 | `@sigx/richtext-markdown` | `markdownFormat`, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`, `markdownNodes` / `markdownSchema`, `collectDefinitions`, the `MarkdownPluginSlice` contract (`block`, `inline`, `serialize`, `entities`, `transformBlock`, `transformDocument`), `mentionPlugin` / `mentionMarkdown` |
 | `@sigx/richtext-markdown/editor` | `markdownPreset` — the input rules (`# `, `- `, `**bold**`), Enter rules (```` ``` ````, `---`) and the `text/markdown` clipboard flavour that make a `@sigx/richtext` editor a markdown editor |
-| `@sigx/richtext-markdown/testing` | `toHtml()` — the spec-conformance HTML renderer, byte-compatible with the CommonMark and GFM fixtures |
 
 ## Install
 

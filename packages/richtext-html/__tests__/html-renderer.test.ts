@@ -1,12 +1,16 @@
 /**
- * `toHtml()` against hand-built trees: every output shape the spec's
- * reference HTML uses, so the conformance suites can trust the renderer and
- * blame the parser.
+ * `toHtml()` against hand-built trees: every output shape the CommonMark and
+ * GFM reference HTML uses, so the conformance suites (in
+ * `@sigx/richtext-markdown`'s tests) can trust the renderer and blame the
+ * parser. Rendered without URL sanitising, as the suites do.
  */
 
 import { describe, expect, it } from 'vitest';
 import type { AlignType, BlockContent, Blockquote, Code, Definition, Heading, HeadingDepth, Html, Image, ImageReference, InlineCode, Link, LinkReference, List, ListItem, Paragraph, PhrasingContent, ReferenceType, Root, Table, TableCell, TableRow, Text, ThematicBreak } from '@sigx/richtext';
-import { toHtml } from '../../src/testing/html.js';
+import type { ToHtmlOptions } from '../src/serialize.js';
+import { toHtml as render } from '../src/serialize.js';
+
+const toHtml = (root: Root, options: ToHtmlOptions = {}): string => render(root, { sanitize: false, ...options });
 
 // -- builders ---------------------------------------------------------------
 
