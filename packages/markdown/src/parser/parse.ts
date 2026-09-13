@@ -7,18 +7,18 @@
  */
 
 import type { BlockContent, PhrasingContent, Root } from '../ast/index.js';
-import type { MarkdownPlugin } from '../plugin/index.js';
-import { resolvePlugins } from '../plugin/index.js';
+import type { RichTextPlugin } from '../plugin/index.js';
+import { resolveMarkdownPlugins } from '../plugin/index.js';
 import { parseBlocks } from './blocks.js';
 import { parseInline } from './inline.js';
 import { normalizeSource } from './scanner.js';
 
 export interface ParseOptions {
-    plugins?: readonly MarkdownPlugin[];
+    plugins?: readonly RichTextPlugin[];
 }
 
 export function parseMarkdown(src: string, options?: ParseOptions): Root {
-    const plugins = resolvePlugins(options?.plugins);
+    const plugins = resolveMarkdownPlugins(options?.plugins);
     const norm = normalizeSource(src ?? '');
     const { children, end } = parseBlocks(norm, { plugins });
 

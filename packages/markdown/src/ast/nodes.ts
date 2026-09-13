@@ -76,6 +76,8 @@ export interface Keyed {
 export interface RootData extends Data {
     /** JSON document format version (see `CURRENT_VERSION`). */
     version?: number;
+    /** The id of the format the document was parsed from (`toJSON({ format })`). */
+    format?: string;
 }
 
 export interface Root extends Parent {

@@ -30,7 +30,7 @@ import type {
     Text,
     ThematicBreak,
 } from '../../src/ast/index.js';
-import type { MarkdownPlugin } from '../../src/plugin/index.js';
+import type { RichTextPlugin } from '../../src/plugin/index.js';
 import { toMarkdown } from '../../src/serializer/index.js';
 
 // ---------------------------------------------------------------------------
@@ -405,11 +405,9 @@ describe('toMarkdown — plugins and unknown nodes', () => {
     });
 
     const mention = (name: string): Node => ({ type: 'mention', name } as Node);
-    const plugin: MarkdownPlugin = {
+    const plugin: RichTextPlugin = {
         name: 'mention',
-        serialize: {
-            mention: (node: Node & { name: string }, ctx) => '@' + ctx.escapeText(node.name),
-        },
+        formats: { markdown: { serialize: { mention: (node: Node & { name: string }, ctx) => '@' + ctx.escapeText(node.name) } } },
     };
 
     it('uses a plugin rule with the context', () => {
@@ -419,14 +417,18 @@ describe('toMarkdown — plugins and unknown nodes', () => {
 
     it('lets a rule override a built-in type and reach the options and indent', () => {
         const seen: { indent: string; options: unknown }[] = [];
-        const override: MarkdownPlugin = {
+        const override: RichTextPlugin = {
             name: 'override',
-            serialize: {
-                code: (node: Code, ctx) => {
-                    seen.push({ indent: ctx.indent, options: ctx.options });
-                    return '<code>' + node.value + '</code>';
+            formats: {
+                markdown: {
+                    serialize: {
+                        code: (node: Code, ctx) => {
+                            seen.push({ indent: ctx.indent, options: ctx.options });
+                            return '<code>' + node.value + '</code>';
+                        },
+                        paragraph: (node: Paragraph, ctx) => ctx.serializeChildren(node) + '!',
+                    },
                 },
-                paragraph: (node: Paragraph, ctx) => ctx.serializeChildren(node) + '!',
             },
         };
         const options = { plugins: [override] };
@@ -435,11 +437,15 @@ describe('toMarkdown — plugins and unknown nodes', () => {
     });
 
     it('ctx.serialize and ctx.serializeChildren dispatch inline vs blocks', () => {
-        const wrap: MarkdownPlugin = {
+        const wrap: RichTextPlugin = {
             name: 'wrap',
-            serialize: {
-                box: (node: Node & { children: Node[] }, ctx) => '::: box\n' + ctx.serializeChildren(node) + '\n:::',
-                note: (node: Node & { child: Node }, ctx) => '(' + ctx.serialize(node.child) + ')',
+            formats: {
+                markdown: {
+                    serialize: {
+                        box: (node: Node & { children: Node[] }, ctx) => '::: box\n' + ctx.serializeChildren(node) + '\n:::',
+                        note: (node: Node & { child: Node }, ctx) => '(' + ctx.serialize(node.child) + ')',
+                    },
+                },
             },
         };
         const box = { type: 'box', children: [p('a'), p('b')] } as unknown as BlockContent;
@@ -458,13 +464,17 @@ describe('toMarkdown — plugins and unknown nodes', () => {
 
     it('never throws: a throwing or non-string rule yields nothing', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const bad: MarkdownPlugin = {
+        const bad: RichTextPlugin = {
             name: 'bad',
-            serialize: {
-                boom: () => {
-                    throw new Error('nope');
+            formats: {
+                markdown: {
+                    serialize: {
+                        boom: () => {
+                            throw new Error('nope');
+                        },
+                        num: () => 42 as unknown as string,
+                    },
                 },
-                num: () => 42 as unknown as string,
             },
         };
         const boom = { type: 'boom' } as unknown as PhrasingContent;

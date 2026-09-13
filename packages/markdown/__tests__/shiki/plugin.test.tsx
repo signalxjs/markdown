@@ -3,6 +3,7 @@ import { jsx } from 'sigx';
 import { render } from '@sigx/runtime-dom';
 import { RichTextView } from '../../src/dom/index.js';
 import { shikiPlugin, type ShikiModule } from '../../src/shiki/index.js';
+import { markdownFormat } from '../../src/markdown/index.js';
 
 const containers: HTMLDivElement[] = [];
 afterEach(() => {
@@ -37,7 +38,7 @@ describe('shikiPlugin', () => {
 
     it('highlights code blocks of a RichTextView that installs it', async () => {
         const plugins = [shikiPlugin({ load: () => Promise.resolve(fakeShiki) })];
-        const c = mount(jsx(RichTextView, { value: '```ts\nconst x = 1\n```', plugins }));
+        const c = mount(jsx(RichTextView, { format: markdownFormat, value: '```ts\nconst x = 1\n```', plugins }));
         expect(c.querySelector('pre > code')!.textContent).toBe('const x = 1');
         await tick();
         await tick();

@@ -1,3 +1,4 @@
+export type { PlatformComponentMap, PlatformComponents, PluginFormats, RichTextPlugin } from './types.js';
 export type {
     BlockContinue,
     BlockFinishContext,
@@ -8,11 +9,9 @@ export type {
     InlineMatchContext,
     InlineSyntaxExtension,
     LineInfo,
-    MarkdownPlatformComponents,
-    PlatformComponentMap,
-    MarkdownPlugin,
+    MarkdownPluginSlice,
     SerializeContext,
     SerializeRule,
-} from './types.js';
-export { resolvePlugins, NO_PLUGINS } from './resolve.js';
-export type { ResolvedPlugins } from './resolve.js';
+} from './markdown.js';
+export { resolveMarkdownPlugins, NO_MARKDOWN_PLUGINS } from './resolve.js';
+export type { ResolvedMarkdownPlugins } from './resolve.js';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createIncrementalEngine, parseMarkdown } from '../../src/parser/index.js';
-import type { InlineSyntaxExtension, MarkdownPlugin } from '../../src/plugin/index.js';
+import type { InlineSyntaxExtension, RichTextPlugin } from '../../src/plugin/index.js';
 import type { Code, List, Paragraph, PhrasingContent } from '../../src/ast/index.js';
 
 describe('incremental engine', () => {
@@ -138,7 +138,7 @@ describe('incremental engine (plugins)', () => {
             return { node: { type: 'mention', label: m[1], id: m[2] } as unknown as PhrasingContent, end: pos + m[0].length };
         },
     };
-    const plugin: MarkdownPlugin = { name: 'mention', inline: [mention] };
+    const plugin: RichTextPlugin = { name: 'mention', formats: { markdown: { inline: [mention] } } };
 
     it('parses extensions in finalized and live blocks', () => {
         const e = createIncrementalEngine({ plugins: [plugin] });
@@ -168,11 +168,15 @@ describe('incremental engine (plugins)', () => {
 
     it('runs transformBlock once per finalized block', () => {
         let calls = 0;
-        const p: MarkdownPlugin = {
+        const p: RichTextPlugin = {
             name: 't',
-            transformBlock: (node) => {
-                calls++;
-                return node;
+            formats: {
+                markdown: {
+                    transformBlock: (node) => {
+                        calls++;
+                        return node;
+                    },
+                },
             },
         };
         const e = createIncrementalEngine({ plugins: [p] });

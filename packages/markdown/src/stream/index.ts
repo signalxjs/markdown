@@ -1,2 +1,2 @@
-export { createMarkdownStream } from './create-markdown-stream.js';
-export type { CreateMarkdownStreamOptions, MarkdownStream } from './create-markdown-stream.js';
+export { createTextStream } from './create-text-stream.js';
+export type { CreateTextStreamOptions, TextStream } from './create-text-stream.js';

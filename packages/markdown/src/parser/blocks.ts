@@ -39,9 +39,9 @@ import type {
     BlockState,
     BlockSyntaxExtension,
     LineInfo,
-    ResolvedPlugins,
+    ResolvedMarkdownPlugins,
 } from '../plugin/index.js';
-import { NO_PLUGINS } from '../plugin/index.js';
+import { NO_MARKDOWN_PLUGINS } from '../plugin/index.js';
 import { parseInline } from './inline.js';
 import {
     isSpaceOrTab,
@@ -56,7 +56,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export interface ParseBlocksOptions {
-    plugins?: ResolvedPlugins;
+    plugins?: ResolvedMarkdownPlugins;
     /** Absolute offset of `src[0]` in the whole document (incremental parsing). */
     baseOffset?: number;
     /** 1-based line number of the first line of `src`. */
@@ -204,7 +204,7 @@ const RE_ORDERED = /^(\d{1,9})([.)])/;
 const RE_MAYBE_SPECIAL = /^[#`~*+_=<>0-9\-|:]/;
 
 class BlockParser {
-    private readonly plugins: ResolvedPlugins;
+    private readonly plugins: ResolvedMarkdownPlugins;
     private readonly entities: ReadonlyMap<string, string> | undefined;
     private readonly baseOffset: number;
     private readonly baseLine: number;
@@ -235,7 +235,7 @@ class BlockParser {
     private prevContentLineEnd = 0;
 
     constructor(options: ParseBlocksOptions) {
-        this.plugins = options.plugins ?? NO_PLUGINS;
+        this.plugins = options.plugins ?? NO_MARKDOWN_PLUGINS;
         this.entities = this.plugins.entities.size ? this.plugins.entities : undefined;
         this.baseOffset = options.baseOffset ?? 0;
         this.baseLine = options.baseLine ?? 1;

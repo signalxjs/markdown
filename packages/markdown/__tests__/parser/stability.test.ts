@@ -9,13 +9,15 @@ import { createIncrementalEngine, parseMarkdown } from '../../src/parser/index.j
 import { mentionPlugin } from '../../src/plugins/index.js';
 import { seededChunks, strip } from '../../src/testing/index.js';
 import { loadCommonMark, loadSigxFixtures } from '../helpers.js';
-import type { BlockSyntaxExtension, MarkdownPlugin } from '../../src/plugin/index.js';
+import type { BlockSyntaxExtension, RichTextPlugin } from '../../src/plugin/index.js';
 import type { Root } from '../../src/ast/index.js';
 
 /** A `:::note` … `:::` container block extension, the shape a callout plugin has. */
-const notePlugin: MarkdownPlugin = {
+const notePlugin: RichTextPlugin = {
     name: 'note',
-    block: [
+    formats: {
+        markdown: {
+            block: [
         {
             name: 'note',
             triggerChars: [':'],
@@ -28,6 +30,8 @@ const notePlugin: MarkdownPlugin = {
         } satisfies BlockSyntaxExtension<never, string>,
     ],
     serialize: { note: (node: { kind: string }, ctx) => `:::${node.kind}\n${ctx.serializeChildren(node as never)}\n:::` },
+        },
+    },
 };
 
 const plugins = [mentionPlugin, notePlugin];
@@ -40,7 +44,7 @@ const plugins = [mentionPlugin, notePlugin];
 function checkRun(
     source: string,
     chunkAt: (i: number) => number,
-    options: { plugins?: MarkdownPlugin[]; label: string },
+    options: { plugins?: RichTextPlugin[]; label: string },
 ): Root {
     const engine = createIncrementalEngine({ plugins: options.plugins });
     let prev: Root | null = null;

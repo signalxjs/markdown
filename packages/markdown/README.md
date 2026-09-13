@@ -3,13 +3,13 @@
 Markdown for [SignalX](https://sigx.dev/) — an mdast-compatible AST, an
 incremental parser that keeps finalized blocks stable while a source string
 grows (built for token-by-token AI output), a serializer, a save-friendly JSON
-document, `createMarkdownStream()`, and a renderer-neutral render engine with a
+document, `createTextStream()`, and a renderer-neutral render engine with a
 plugin contract shared by the parser, the serializer, every renderer and the
 block-tree editor. Zero dependencies, no `node:` imports.
 
 | Entry | What |
 |---|---|
-| `@sigx/markdown` | the AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`, `toJSON` / `fromJSON`, `createMarkdownStream`, `renderDocument`, the `MarkdownPlugin` contract, `mentionPlugin` |
+| `@sigx/markdown` | the AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`, `toJSON` / `fromJSON`, `createTextStream`, `renderDocument`, the `RichTextPlugin` contract, `mentionPlugin` |
 | `@sigx/markdown/testing` | `strip()`, `toHtml()`, `feed()` — helpers for tests that parse, stream or render |
 | `@sigx/markdown/dom` | `RichTextView` for the web, the default DOM components (`data-scope` / `data-part` styling seam), the `CodeBlock` chrome, the `CodeHighlighter` contract and `highlightedCodeBlock()` |
 | `@sigx/markdown/shiki` | `createShikiHighlighter()` + `shikiPlugin()` — Shiki behind the `CodeHighlighter` contract (`shiki` is an optional peer) |
@@ -40,16 +40,17 @@ const b = engine.parse('# Hi\n\nSome **markdown**.');
 a.children[0] === b.children[0];                             // true: finalized blocks keep identity
 ```
 
-Streaming: `createMarkdownStream({ flushIntervalMs: 16 })` coalesces tokens
+Streaming: `createTextStream({ flushIntervalMs: 16 })` coalesces tokens
 into one signal write per frame; pass `stream.value.value` to a view.
 
 ```tsx
+import { markdownFormat } from '@sigx/markdown';
 import { RichTextView } from '@sigx/markdown/dom';
 import { shikiPlugin } from '@sigx/markdown/shiki';
 
 const plugins = [shikiPlugin()];
 
-<RichTextView value={stream.value.value} plugins={plugins} onLink={(url) => router.push(url)} />
+<RichTextView value={stream.value.value} format={markdownFormat} plugins={plugins} onLink={(url) => router.push(url)} />
 ```
 
 Every element carries `data-scope="markdown"` and `data-part="heading"`,

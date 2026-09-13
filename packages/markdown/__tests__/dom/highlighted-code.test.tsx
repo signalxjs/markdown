@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { component, render, signal } from 'sigx';
 import { RichTextView, highlightedCodeBlock, type CodeHighlighter, type DomComponents, type HighlightedToken } from '../../src/dom/index.js';
+import { markdownFormat } from '../../src/markdown/index.js';
 
 // ---------------------------------------------------------------------------
 // A controllable fake highlighter: every highlight() call is parked until the
@@ -82,7 +83,7 @@ interface Mounted {
  */
 function mount(initial: string, components: Partial<DomComponents>): Mounted {
     const source = signal(initial);
-    const App = component(() => () => <RichTextView value={source.value} components={components} />);
+    const App = component(() => () => <RichTextView format={markdownFormat} value={source.value} components={components} />);
     const container = document.createElement('div');
     document.body.appendChild(container);
     render(<App />, container);

@@ -1,30 +1,32 @@
 /**
- * `createMarkdownStream()` — a one-line bridge between an AI token loop and a
- * markdown view.
+ * `createTextStream()` — a one-line bridge between an AI token loop and a
+ * view.
  *
  * It owns a reactive `value` signal and coalesces bursts of `append()` calls
  * into a single signal write per `flushIntervalMs` window, so a fast token
  * stream re-renders at a bounded rate instead of once per token. `pipe()`
- * drains an `AsyncIterable<string>` (a completion stream) into it.
+ * drains an `AsyncIterable<string>` (a completion stream) into it. Format-
+ * agnostic: it accumulates text; the view parses it with whatever format it
+ * was given.
  *
  * @example
  * ```ts
- * const md = createMarkdownStream({ flushIntervalMs: 16 });
+ * const text = createTextStream({ flushIntervalMs: 16 });
  *
  * // producer — by hand…
- * for await (const token of completion) md.append(token);
- * md.done();
+ * for await (const token of completion) text.append(token);
+ * text.done();
  * // …or piped
- * await md.pipe(completion, controller.signal);
+ * await text.pipe(completion, controller.signal);
  *
  * // consumer
- * <MarkdownView value={md.value.value} />
+ * <RichTextView value={text.value.value} format={markdownFormat} />
  * ```
  */
 
 import { signal, type PrimitiveSignal } from '@sigx/reactivity';
 
-export interface CreateMarkdownStreamOptions {
+export interface CreateTextStreamOptions {
     /**
      * Coalesce `append()` calls within this many milliseconds into a single
      * `value` update. `0` (default) flushes synchronously on every append.
@@ -33,10 +35,10 @@ export interface CreateMarkdownStreamOptions {
     flushIntervalMs?: number;
 }
 
-export interface MarkdownStream {
+export interface TextStream {
     /** Reactive accumulated source. */
     readonly value: PrimitiveSignal<string>;
-    /** Reactive completion flag, set by {@link MarkdownStream.done}. */
+    /** Reactive completion flag, set by {@link TextStream.done}. */
     readonly finished: PrimitiveSignal<boolean>;
     /** Append a token/chunk; buffered and coalesced into `value`. */
     append(chunk: string): void;
@@ -53,7 +55,7 @@ export interface MarkdownStream {
     pipe(source: AsyncIterable<string>, signal?: AbortSignal): Promise<void>;
 }
 
-export function createMarkdownStream(opts?: CreateMarkdownStreamOptions): MarkdownStream {
+export function createTextStream(opts?: CreateTextStreamOptions): TextStream {
     const flushIntervalMs = opts?.flushIntervalMs ?? 0;
     const value = signal('');
     const finished = signal(false);

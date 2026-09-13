@@ -1,20 +1,16 @@
 /**
- * Resolve a plugin list into the lookup tables the parser, serializer and
- * renderers consume. Done once per parser/engine/view instance; the result is
- * immutable so a caller mutating its plugin array afterwards cannot change
- * parse behaviour under cached finalized blocks.
+ * Resolve a plugin list's markdown slots into the lookup tables the markdown
+ * parser and serializer consume. Done once per parser/engine/view instance;
+ * the result is immutable so a caller mutating its plugin array afterwards
+ * cannot change parse behaviour under cached finalized blocks.
  */
 
-import type {
-    BlockSyntaxExtension,
-    InlineSyntaxExtension,
-    MarkdownPlugin,
-    SerializeRule,
-} from './types.js';
+import type { BlockSyntaxExtension, InlineSyntaxExtension, MarkdownPluginSlice, SerializeRule } from './markdown.js';
+import type { RichTextPlugin } from './types.js';
 
-export interface ResolvedPlugins {
+export interface ResolvedMarkdownPlugins {
     /** The plugins that were kept, in order. */
-    readonly plugins: readonly MarkdownPlugin[];
+    readonly plugins: readonly RichTextPlugin[];
     /** Block extensions in registration order. */
     // oxlint-disable-next-line no-explicit-any
     readonly block: readonly BlockSyntaxExtension<any, any>[];
@@ -31,12 +27,12 @@ export interface ResolvedPlugins {
     /** Extra named entities (last registered wins). */
     readonly entities: ReadonlyMap<string, string>;
     /** Block transforms in registration order. */
-    readonly transformBlock: readonly NonNullable<MarkdownPlugin['transformBlock']>[];
+    readonly transformBlock: readonly NonNullable<MarkdownPluginSlice['transformBlock']>[];
     /** Document transforms in registration order. */
-    readonly transformDocument: readonly NonNullable<MarkdownPlugin['transformDocument']>[];
+    readonly transformDocument: readonly NonNullable<MarkdownPluginSlice['transformDocument']>[];
 }
 
-const EMPTY: ResolvedPlugins = Object.freeze({
+const EMPTY: ResolvedMarkdownPlugins = Object.freeze({
     plugins: Object.freeze([]),
     block: Object.freeze([]),
     inline: Object.freeze([]),
@@ -46,13 +42,13 @@ const EMPTY: ResolvedPlugins = Object.freeze({
     entities: new Map(),
     transformBlock: Object.freeze([]),
     transformDocument: Object.freeze([]),
-}) as ResolvedPlugins;
+}) as ResolvedMarkdownPlugins;
 
-/** Resolve (and validate) a plugin list. `undefined`/empty yields a shared empty result. */
-export function resolvePlugins(plugins?: readonly MarkdownPlugin[] | null): ResolvedPlugins {
+/** Resolve (and validate) the markdown slots of a plugin list. `undefined`/empty yields a shared empty result. */
+export function resolveMarkdownPlugins(plugins?: readonly RichTextPlugin[] | null): ResolvedMarkdownPlugins {
     if (!plugins || plugins.length === 0) return EMPTY;
 
-    const kept: MarkdownPlugin[] = [];
+    const kept: RichTextPlugin[] = [];
     const names = new Set<string>();
     // oxlint-disable-next-line no-explicit-any
     const block: BlockSyntaxExtension<any, any>[] = [];
@@ -63,8 +59,8 @@ export function resolvePlugins(plugins?: readonly MarkdownPlugin[] | null): Reso
     // oxlint-disable-next-line no-explicit-any
     const serialize = new Map<string, SerializeRule<any>>();
     const entities = new Map<string, string>();
-    const transformBlock: NonNullable<MarkdownPlugin['transformBlock']>[] = [];
-    const transformDocument: NonNullable<MarkdownPlugin['transformDocument']>[] = [];
+    const transformBlock: NonNullable<MarkdownPluginSlice['transformBlock']>[] = [];
+    const transformDocument: NonNullable<MarkdownPluginSlice['transformDocument']>[] = [];
     const extNames = new Set<string>();
 
     for (const plugin of plugins) {
@@ -79,24 +75,26 @@ export function resolvePlugins(plugins?: readonly MarkdownPlugin[] | null): Reso
         names.add(plugin.name);
         kept.push(plugin);
 
-        for (const ext of plugin.block ?? []) {
+        const slice = plugin.formats?.markdown;
+        if (!slice) continue;
+        for (const ext of slice.block ?? []) {
             if (!validExtension(ext, plugin.name, extNames)) continue;
             block.push(ext);
             for (const ch of ext.triggerChars) blockTriggers.add(ch);
         }
-        for (const ext of plugin.inline ?? []) {
+        for (const ext of slice.inline ?? []) {
             if (!validExtension(ext, plugin.name, extNames)) continue;
             inline.push(ext);
             for (const ch of ext.triggerChars) inlineTriggers.add(ch);
         }
-        if (plugin.serialize) {
-            for (const [type, rule] of Object.entries(plugin.serialize)) serialize.set(type, rule);
+        if (slice.serialize) {
+            for (const [type, rule] of Object.entries(slice.serialize)) serialize.set(type, rule);
         }
-        if (plugin.entities) {
-            for (const [name, value] of Object.entries(plugin.entities)) entities.set(name, value);
+        if (slice.entities) {
+            for (const [name, value] of Object.entries(slice.entities)) entities.set(name, value);
         }
-        if (plugin.transformBlock) transformBlock.push(plugin.transformBlock);
-        if (plugin.transformDocument) transformDocument.push(plugin.transformDocument);
+        if (slice.transformBlock) transformBlock.push(slice.transformBlock);
+        if (slice.transformDocument) transformDocument.push(slice.transformDocument);
     }
 
     return Object.freeze({
@@ -139,4 +137,4 @@ function validExtension(
 }
 
 /** The shared empty resolution, for callers that want to test for "no plugins". */
-export const NO_PLUGINS: ResolvedPlugins = EMPTY;
+export const NO_MARKDOWN_PLUGINS: ResolvedMarkdownPlugins = EMPTY;

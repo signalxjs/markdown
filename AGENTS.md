@@ -193,15 +193,17 @@ Source layout (`packages/markdown/src`):
 - **One folder per concern; its `index.ts` is the folder's public surface.**
   `utils/`, `ast/` (the node types), `schema/` (`NodeSpec` / `Schema` — the
   one table that says what every node type is; `standardNodes`,
-  `markdownNodes`), `plugin/` (the contract), `document/` (`toJSON` /
-  `fromJSON`, definitions), `parser/`, `serializer/`,
+  `markdownNodes`), `plugin/` (the contract; `plugin/markdown.ts` is the
+  markdown syntax slot), `document/` (`DocumentFormat`, the incremental
+  engine, `toJSON` / `fromJSON`), `parser/`, `serializer/`, `markdown/`
+  (`markdownFormat`),
   `render/`, `stream/`, `plugins/` (the reference plugins, e.g. mention),
   `dom/`, `shiki/`, `editor/` (with `editor/dom/`), `testing/`. Cross-folder
   imports go through `../<folder>/index.js`; inside a folder, siblings import
   each other directly. A file a folder's `index.ts` does not re-export is
   private to that folder.
 - **Imports point one way**:
-  `utils ← ast ← schema ← plugin ← document ← parser ← serializer ← render ← plugins`; `stream/`
+  `utils ← ast ← schema ← plugin ← document ← parser ← serializer ← markdown ← render ← plugins`; `stream/`
   depends on `@sigx/reactivity` only; `dom ← shiki` and `editor ← editor/dom` sit on
   top of the root layers (`editor/dom` may import `dom` — void blocks render
   through the DOM components — never the reverse); `testing/` is on top of everything and nothing

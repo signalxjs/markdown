@@ -1,11 +1,11 @@
 /**
- * The editor slice of `MarkdownPlugin` — what a plugin contributes to the
+ * The editor slice of `RichTextPlugin` — what a plugin contributes to the
  * editing experience on top of its node specs, syntax, serializer and
  * component halves. Typed here (the core `plugin/types.ts` leaves `editor`
  * open) so the root entry never depends on editor code.
  */
 
-import type { MarkdownPlugin } from '../plugin/index.js';
+import type { RichTextPlugin } from '../plugin/index.js';
 import type { Command } from './commands.js';
 import type { InputRule } from './input-rules.js';
 import type { Keymap } from './keymap.js';
@@ -25,13 +25,13 @@ export interface EditorPluginSlice {
     onTransaction?(tr: Transaction, state: EditorState): Transaction | null;
 }
 
-/** A `MarkdownPlugin` whose `editor` slot is typed. Node types come through `MarkdownPlugin.nodes`. */
-export interface EditorPlugin extends MarkdownPlugin {
+/** A `RichTextPlugin` whose `editor` slot is typed. Node types come through `RichTextPlugin.nodes`. */
+export interface EditorPlugin extends RichTextPlugin {
     editor?: EditorPluginSlice;
 }
 
 /** Read the editor slice of a plugin (plugins without one contribute nothing). */
-export function editorSlice(plugin: MarkdownPlugin): EditorPluginSlice {
+export function editorSlice(plugin: RichTextPlugin): EditorPluginSlice {
     const slice = (plugin as EditorPlugin).editor;
     return slice && typeof slice === 'object' ? slice : {};
 }

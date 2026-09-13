@@ -1,19 +1,22 @@
 /**
  * `<RichTextView>` — the web renderer.
  *
- * Owns one incremental engine per instance, so a growing `value` (an AI token
- * loop through `createMarkdownStream`, or `useChat`'s `part.text`) re-parses
- * only the live tail and re-renders only the block still being written:
- * finalized blocks keep their identity and their keys, and the DOM reconciler
- * never remounts them.
+ * Owns one incremental engine per instance (the format's, when it offers
+ * one), so a growing `value` (an AI token loop through `createTextStream`,
+ * or `useChat`'s `part.text`) re-parses only the live tail and re-renders
+ * only the block still being written: finalized blocks keep their identity
+ * and their keys, and the DOM reconciler never remounts them.
  *
- * Rendering is generic and schema-driven: `components` overrides any slot of
- * the default DOM map (a design system passes its own), `plugins` add node
- * types (`nodes`), syntax and — through `components.dom` — their renderers.
+ * Rendering is generic and schema-driven: `format` decides how `value` is
+ * parsed (this entry knows no format — pass `markdownFormat` from the root
+ * entry), `components` overrides any slot of the
+ * default DOM map (a design system passes its own), `plugins` add node types
+ * (`nodes`), syntax (`formats`) and — through `components.dom` — their
+ * renderers.
  *
  * @example
  * ```tsx
- * <RichTextView value={stream.value.value} onLink={(url) => router.push(url)} />
+ * <RichTextView value={stream.value.value} format={markdownFormat} onLink={(url) => router.push(url)} />
  * ```
  */
 
@@ -21,21 +24,23 @@ import { computed } from '@sigx/reactivity';
 import { component, mergeProps, type Define, type JSXElement } from '@sigx/runtime-core';
 import type {} from '@sigx/runtime-dom';
 import type { Root } from '../ast/index.js';
-import type { MarkdownPlugin } from '../plugin/index.js';
-import { createIncrementalEngine } from '../parser/index.js';
+import { createReparseEngine, type DocumentFormat, type IncrementalEngine } from '../document/index.js';
+import type { RichTextPlugin } from '../plugin/index.js';
 import { renderDocument, type RenderContext, type UrlKind } from '../render/index.js';
-import { createSchema, markdownNodes, standardNodes, type Schema } from '../schema/index.js';
+import { createSchema, standardNodes, type Schema } from '../schema/index.js';
 import { createDomComponents, type DomComponents, type DomLinkHandler } from './components.js';
 import { partAttrs } from './parts.js';
 
 export type RichTextViewProps = Define.WithAttrs<
-    /** Markdown source. Reactive: append to it and only the live block re-renders. */
+    /** Source text in `format`. Reactive: append to it and only the live block re-renders. */
     & Define.Prop<'value', string>
     /** A parsed tree instead of source (wins over `value`). Keys are assigned if missing. */
     & Define.Prop<'root', Root>
+    /** The format `value` is written in (its `nodes` join the schema). A new identity re-creates the engine. */
+    & Define.Prop<'format', DocumentFormat, true>
     /** Plugins. Pass a stable array: a new identity re-creates the engine and re-parses from scratch. */
-    & Define.Prop<'plugins', readonly MarkdownPlugin[]>
-    /** The schema to render with. Default: the standard and markdown specs plus every plugin's `nodes`. */
+    & Define.Prop<'plugins', readonly RichTextPlugin[]>
+    /** The schema to render with. Default: the standard specs, the format's and every plugin's `nodes`. */
     & Define.Prop<'schema', Schema>
     /** Overrides for any slot of the default component map, plus plugin node renderers. */
     & Define.Prop<'components', Partial<DomComponents>>
@@ -51,30 +56,40 @@ export type RichTextViewProps = Define.WithAttrs<
     & Define.Prop<'copyButton', boolean>
 >;
 
-const OWN_PROPS = ['value', 'root', 'plugins', 'schema', 'components', 'onLink', 'linkTarget', 'sanitizeUrl', 'classPrefix', 'copyButton'] as const;
+const OWN_PROPS = ['value', 'root', 'format', 'plugins', 'schema', 'components', 'onLink', 'linkTarget', 'sanitizeUrl', 'classPrefix', 'copyButton'] as const;
 
 /** The DOM renderers plugins ship (`plugin.components.dom`), merged in registration order. */
-export function pluginDomComponents(plugins: readonly MarkdownPlugin[] | undefined): Partial<DomComponents> {
+export function pluginDomComponents(plugins: readonly RichTextPlugin[] | undefined): Partial<DomComponents> {
     const out: Partial<DomComponents> = {};
     for (const plugin of plugins ?? []) Object.assign(out, plugin.components?.dom as Partial<DomComponents> | undefined);
     return out;
 }
 
+/** The format's incremental engine, or a re-parse engine when it has none. */
+export function engineFor(format: DocumentFormat, plugins: readonly RichTextPlugin[] | undefined): IncrementalEngine {
+    return format.createIncrementalEngine?.({ plugins }) ?? createReparseEngine((source) => format.parse(source, { plugins }));
+}
+
 export const RichTextView = component<RichTextViewProps>(({ props }) => {
-    // The engine captures its plugins at construction; recreate it when the
-    // prop changes identity (rare — normally a module constant).
-    let engine = createIncrementalEngine({ plugins: props.plugins });
+    // The engine captures its format and plugins at construction; recreate it
+    // when either prop changes identity (rare — normally module constants).
+    let lastFormat = props.format;
     let lastPlugins = props.plugins;
+    let engine = engineFor(lastFormat, lastPlugins);
     const root = computed<Root>(() => {
         if (props.root) return props.root;
-        if (props.plugins !== lastPlugins) {
+        const format = props.format;
+        if (format !== lastFormat || props.plugins !== lastPlugins) {
+            lastFormat = format;
             lastPlugins = props.plugins;
-            engine = createIncrementalEngine({ plugins: lastPlugins });
+            engine = engineFor(format, lastPlugins);
         }
         return engine.parse(props.value ?? '');
     });
 
-    const schema = computed<Schema>(() => props.schema ?? createSchema([...standardNodes, ...markdownNodes, ...(props.plugins ?? []).flatMap((p) => p.nodes ?? [])]));
+    const schema = computed<Schema>(
+        () => props.schema ?? createSchema([...standardNodes, ...(props.format.nodes ?? []), ...(props.plugins ?? []).flatMap((p) => p.nodes ?? [])]),
+    );
     const pluginComponents = computed(() => pluginDomComponents(props.plugins));
 
     const defaults = computed(() =>

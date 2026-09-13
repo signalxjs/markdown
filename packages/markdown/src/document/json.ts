@@ -1,6 +1,8 @@
 /**
- * The save-friendly document format: the mdast `Root` itself, as plain JSON,
- * with `data.version` for forward compatibility.
+ * The save-friendly document format: the `Root` itself, as plain JSON, with
+ * `data.version` for forward compatibility and `data.format` naming the
+ * source format it was parsed from (informational — the tree is the same
+ * whatever the format).
  *
  * `toJSON()` deep-clones and strips what is transient (reconciliation keys,
  * the streaming `open` flag, and — by default — positions); `fromJSON()`
@@ -15,17 +17,17 @@ import type { Node, Root, RootData } from '../ast/index.js';
 export const CURRENT_VERSION = 1;
 
 /** A `Root` whose `data.version` is set — what `toJSON()` returns. */
-export interface MarkdownDocument extends Root {
+export interface RichTextDocument extends Root {
     data: RootData & { version: number };
 }
 
-export type MarkdownFormatErrorCode = 'invalid-shape' | 'unsupported-version';
+export type DocumentFormatErrorCode = 'invalid-shape' | 'unsupported-version';
 
-export class MarkdownFormatError extends Error {
-    readonly code: MarkdownFormatErrorCode;
-    constructor(code: MarkdownFormatErrorCode, message: string) {
+export class DocumentFormatError extends Error {
+    readonly code: DocumentFormatErrorCode;
+    constructor(code: DocumentFormatErrorCode, message: string) {
         super(message);
-        this.name = 'MarkdownFormatError';
+        this.name = 'DocumentFormatError';
         this.code = code;
     }
 }
@@ -38,10 +40,12 @@ export interface FromJSONOptions {
 export interface ToJSONOptions {
     /** Keep `position` on every node. Default `false`. */
     position?: boolean;
+    /** Record the source format's id in `data.format`. */
+    format?: string;
 }
 
 /** Serialize a tree to the JSON document format (a deep clone; the input is untouched). */
-export function toJSON(root: Root, options?: ToJSONOptions): MarkdownDocument {
+export function toJSON(root: Root, options?: ToJSONOptions): RichTextDocument {
     const keepPosition = options?.position === true;
     const clone = (node: Node): Node => {
         const out: Record<string, unknown> = {};
@@ -57,8 +61,9 @@ export function toJSON(root: Root, options?: ToJSONOptions): MarkdownDocument {
         }
         return out as unknown as Node;
     };
-    const doc = clone(root) as MarkdownDocument;
+    const doc = clone(root) as RichTextDocument;
     doc.data = { ...doc.data, version: CURRENT_VERSION };
+    if (options?.format) doc.data.format = options.format;
     return doc;
 }
 
@@ -74,25 +79,29 @@ function cloneValue(value: unknown): unknown {
 
 /**
  * Parse the JSON document format back into a keyed `Root`. Accepts the parsed
- * object (or a JSON string). Throws `MarkdownFormatError` on a wrong shape or
+ * object (or a JSON string). Throws `DocumentFormatError` on a wrong shape or
  * a version newer than this package understands.
  */
 export function fromJSON(input: unknown, options?: FromJSONOptions): Root {
     const json = typeof input === 'string' ? JSON.parse(input) : input;
     if (!isRecord(json) || json.type !== 'root' || !Array.isArray(json.children)) {
-        throw new MarkdownFormatError('invalid-shape', 'Expected a root node with a children array.');
+        throw new DocumentFormatError('invalid-shape', 'Expected a root node with a children array.');
     }
-    const version = isRecord(json.data) ? json.data.version : undefined;
+    const data = isRecord(json.data) ? json.data : undefined;
+    const version = data?.version;
     if (version !== undefined) {
         if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-            throw new MarkdownFormatError('invalid-shape', `Invalid document version: ${String(version)}.`);
+            throw new DocumentFormatError('invalid-shape', `Invalid document version: ${String(version)}.`);
         }
         if (version > CURRENT_VERSION) {
-            throw new MarkdownFormatError(
+            throw new DocumentFormatError(
                 'unsupported-version',
                 `Document version ${version} is newer than the supported version ${CURRENT_VERSION}.`,
             );
         }
+    }
+    if (data?.format !== undefined && typeof data.format !== 'string') {
+        throw new DocumentFormatError('invalid-shape', 'data.format must be a string.');
     }
     validateNodes(json.children, 'children');
     const root = cloneValue(json) as Root;
@@ -103,11 +112,11 @@ function validateNodes(nodes: unknown[], path: string): void {
     for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         if (!isRecord(node) || typeof node.type !== 'string') {
-            throw new MarkdownFormatError('invalid-shape', `Node at ${path}[${i}] has no string type.`);
+            throw new DocumentFormatError('invalid-shape', `Node at ${path}[${i}] has no string type.`);
         }
         if (node.children !== undefined) {
             if (!Array.isArray(node.children)) {
-                throw new MarkdownFormatError('invalid-shape', `Node at ${path}[${i}] has non-array children.`);
+                throw new DocumentFormatError('invalid-shape', `Node at ${path}[${i}] has non-array children.`);
             }
             validateNodes(node.children, `${path}[${i}].children`);
         }
