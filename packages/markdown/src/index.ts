@@ -15,7 +15,6 @@ export * from './plugin/index.js';
 export * from './parser/index.js';
 export * from './serializer/index.js';
 export * from './markdown/index.js';
-export * from './markdown/index.js';
 export * from './render/index.js';
 export * from './stream/index.js';
 export * from './plugins/index.js';

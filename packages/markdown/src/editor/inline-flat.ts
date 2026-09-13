@@ -18,7 +18,8 @@
  *  - a hard break (`inline.kind === 'break'`) is a `\n` in the text.
  *
  * A type the schema does not know is a mark when the node has children and
- * an atom otherwise — so an unregistered plugin node still round-trips.
+ * an atom otherwise, and a span of such a type is an atom only when it covers
+ * exactly one U+FFFC — so an unregistered plugin node still round-trips.
  *
  * `flatEquals()` is the echo guard: a surface pushing back exactly what it
  * was given is a no-op transaction.
@@ -148,8 +149,8 @@ export function normalizeSpans(spans: readonly InlineSpan[]): InlineSpan[] {
 export function toInline(flat: InlineFlat, schema: Schema): PhrasingContent[] {
     const { text } = flat;
     const spans = normalizeSpans(flat.spans);
-    const atoms = spans.filter((s) => isAtomSpan(s, schema));
-    const marks = spans.filter((s) => !isAtomSpan(s, schema));
+    const atoms = spans.filter((s) => isAtomSpan(s, text, schema));
+    const marks = spans.filter((s) => !isAtomSpan(s, text, schema));
 
     // Boundaries: every span edge, every atom, every hard break.
     const points = new Set<number>([0, text.length]);
@@ -247,11 +248,12 @@ function looksLikeAtom(span: InlineSpan, text: string, schema?: Schema): boolean
     return span.end - span.start === 1 && text[span.start] === ATOM_CHAR && schema?.role(span.type) !== 'mark';
 }
 
-function isAtomSpan(span: InlineSpan, schema: Schema): boolean {
+/** Atom by role; for a type the schema does not know, only a one-character span over U+FFFC (an unknown mark over a single letter stays a mark). */
+function isAtomSpan(span: InlineSpan, text: string, schema: Schema): boolean {
     const role = schema.role(span.type);
     if (role === 'atom') return true;
     if (role === 'mark') return false;
-    return span.end - span.start === 1;
+    return span.end - span.start === 1 && text[span.start] === ATOM_CHAR;
 }
 
 function atomNode(span: InlineSpan, schema: Schema): PhrasingContent {
