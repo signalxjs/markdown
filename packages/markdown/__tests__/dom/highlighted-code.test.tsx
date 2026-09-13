@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { component, render, signal } from 'sigx';
-import { MarkdownView, type DomMarkdownComponents } from '../../src/dom/index.js';
-import { shikiCodeBlock, type CodeHighlighter, type HighlightedToken } from '../../src/shiki/index.js';
+import { RichTextView, highlightedCodeBlock, type CodeHighlighter, type DomComponents, type HighlightedToken } from '../../src/dom/index.js';
 
 // ---------------------------------------------------------------------------
 // A controllable fake highlighter: every highlight() call is parked until the
@@ -77,13 +76,13 @@ interface Mounted {
 }
 
 /**
- * Mount a `<MarkdownView>` whose `value` follows a signal. The view sits
+ * Mount a `<RichTextView>` whose `value` follows a signal. The view sits
  * inside a wrapper component so a signal write re-renders it with new props
  * (there is no JSX compiler in the test pipeline to make `value={…}` lazy).
  */
-function mount(initial: string, components: Partial<DomMarkdownComponents>): Mounted {
+function mount(initial: string, components: Partial<DomComponents>): Mounted {
     const source = signal(initial);
-    const App = component(() => () => <MarkdownView value={source.value} components={components} />);
+    const App = component(() => () => <RichTextView value={source.value} components={components} />);
     const container = document.createElement('div');
     document.body.appendChild(container);
     render(<App />, container);
@@ -111,10 +110,10 @@ afterEach(() => {
 
 // ---------------------------------------------------------------------------
 
-describe('shikiCodeBlock', () => {
+describe('highlightedCodeBlock', () => {
     it('renders the plain value first, then the highlighted spans once highlight() resolves', async () => {
         const fake = createFakeHighlighter();
-        const m = mount(CLOSED, { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount(CLOSED, { code: highlightedCodeBlock(fake.highlighter) });
 
         expect(m.code().textContent).toBe('const x = 1');
         expect(m.lines()).toHaveLength(0);
@@ -138,7 +137,7 @@ describe('shikiCodeBlock', () => {
 
     it('keeps the code text exact across several lines', async () => {
         const fake = createFakeHighlighter();
-        const m = mount('```ts\nconst x = 1\n\nx++\n```', { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount('```ts\nconst x = 1\n\nx++\n```', { code: highlightedCodeBlock(fake.highlighter) });
         fake.resolveAll();
         await flush();
         expect(m.lines()).toHaveLength(3);
@@ -148,7 +147,7 @@ describe('shikiCodeBlock', () => {
     it('renders spans synchronously on a peek() hit', () => {
         const fake = createFakeHighlighter();
         fake.cache.set('ts:const x = 1', colorize('const x = 1'));
-        const m = mount(CLOSED, { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount(CLOSED, { code: highlightedCodeBlock(fake.highlighter) });
 
         expect(m.lines()).toHaveLength(1);
         expect(m.tokens()[0].style.getPropertyValue('--shiki-dark')).toBe(DARK);
@@ -157,7 +156,7 @@ describe('shikiCodeBlock', () => {
 
     it('leaves a fence without a language plain and never calls the highlighter', () => {
         const fake = createFakeHighlighter();
-        const m = mount('```\nplain\n```', { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount('```\nplain\n```', { code: highlightedCodeBlock(fake.highlighter) });
         expect(m.code().textContent).toBe('plain');
         expect(m.lines()).toHaveLength(0);
         expect(fake.calls).toHaveLength(0);
@@ -165,14 +164,14 @@ describe('shikiCodeBlock', () => {
 
     it('skips languages the highlighter says it does not support', () => {
         const fake = createFakeHighlighter({ supports: (lang) => lang !== 'ts' });
-        const m = mount(CLOSED, { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount(CLOSED, { code: highlightedCodeBlock(fake.highlighter) });
         expect(m.lines()).toHaveLength(0);
         expect(fake.calls).toHaveLength(0);
     });
 
     it('drops a stale result that resolves after a newer one', async () => {
         const fake = createFakeHighlighter();
-        const m = mount(CLOSED, { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount(CLOSED, { code: highlightedCodeBlock(fake.highlighter) });
         expect(fake.calls).toHaveLength(1);
         const older = fake.calls[0];
 
@@ -197,7 +196,7 @@ describe('shikiCodeBlock', () => {
     it('keeps the code element across a streaming append and re-highlights after the debounce', async () => {
         vi.useFakeTimers();
         const fake = createFakeHighlighter();
-        const m = mount(OPEN, { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount(OPEN, { code: highlightedCodeBlock(fake.highlighter) });
         const codeEl = m.code();
 
         // Open fence: debounced, nothing yet.
@@ -245,7 +244,7 @@ describe('shikiCodeBlock', () => {
 
     it('falls back to plain text when the value no longer extends the last result', async () => {
         const fake = createFakeHighlighter();
-        const m = mount(CLOSED, { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount(CLOSED, { code: highlightedCodeBlock(fake.highlighter) });
         fake.resolveAll();
         await flush();
         expect(m.lines()).toHaveLength(1);
@@ -259,7 +258,7 @@ describe('shikiCodeBlock', () => {
     it('debounces while open and highlights immediately when the fence closes', async () => {
         vi.useFakeTimers();
         const fake = createFakeHighlighter();
-        const m = mount(OPEN, { code: shikiCodeBlock(fake.highlighter) });
+        const m = mount(OPEN, { code: highlightedCodeBlock(fake.highlighter) });
         expect(fake.calls).toHaveLength(0);
 
         m.source.value = CLOSED;
@@ -275,11 +274,11 @@ describe('shikiCodeBlock', () => {
     it('honours debounceMs (0 highlights an open fence at once)', () => {
         vi.useFakeTimers();
         const fake = createFakeHighlighter();
-        mount(OPEN, { code: shikiCodeBlock(fake.highlighter, { debounceMs: 0 }) });
+        mount(OPEN, { code: highlightedCodeBlock(fake.highlighter, { debounceMs: 0 }) });
         expect(fake.calls).toHaveLength(1);
 
         const slow = createFakeHighlighter();
-        mount(OPEN, { code: shikiCodeBlock(slow.highlighter, { debounceMs: 500 }) });
+        mount(OPEN, { code: highlightedCodeBlock(slow.highlighter, { debounceMs: 500 }) });
         vi.advanceTimersByTime(499);
         expect(slow.calls).toHaveLength(0);
         vi.advanceTimersByTime(1);
@@ -288,7 +287,7 @@ describe('shikiCodeBlock', () => {
 
     it('forwards classPrefix and copyButton to the CodeBlock chrome', () => {
         const fake = createFakeHighlighter();
-        const m = mount(CLOSED, { code: shikiCodeBlock(fake.highlighter, { classPrefix: 'md', copyButton: false }) });
+        const m = mount(CLOSED, { code: highlightedCodeBlock(fake.highlighter, { classPrefix: 'md', copyButton: false }) });
         const block = m.container.querySelector('[data-part="code"]');
         expect(block?.classList.contains('md-code')).toBe(true);
         expect(block?.getAttribute('data-lang')).toBe('ts');

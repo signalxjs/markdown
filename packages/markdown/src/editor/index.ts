@@ -119,5 +119,5 @@ export type { EditorPlugin, EditorPluginSlice } from './plugin.js';
 export { turnIntoCommand, filterMenu } from './menu.js';
 export { createSlashPlugin } from './slash.js';
 export type { SlashItem, SlashPluginOptions } from './slash.js';
-export { createMentionPlugin, mentionNode } from './mention.js';
+export { createMentionPlugin } from './mention.js';
 export type { MentionItem, MentionPluginOptions } from './mention.js';

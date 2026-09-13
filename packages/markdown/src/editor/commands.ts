@@ -469,16 +469,15 @@ export const setBlockType =
         }
         if (!steps.length) return false;
         const sel = state.selection;
-        dispatch?.({ steps, selection: sel && sel.mode === 'text' ? clampSelection(sel, state, ctx, type) : sel, meta: meta() });
+        dispatch?.({ steps, selection: sel && sel.mode === 'text' ? clampSelection(sel, steps, ctx) : sel, meta: meta() });
         return true;
     };
 
-function clampSelection(sel: TextSelection, state: EditorState, ctx: CommandContext, targetType: string): EditorSelection {
-    // Keep the caret; the surface clamps on its side too. Hard breaks may vanish (heading), so clamp offsets.
-    const entry = entryOf(state, sel.anchor.key);
-    if (!entry) return sel;
-    const kind = ctx.schema.role(targetType);
-    const len = kind === 'code' ? (ctx.schema.get(entry.node.type)?.toInline?.(entry.node) ?? []).reduce((n, c) => n + ((c as { value?: string }).value?.length ?? 1), 0) : Infinity;
+/** Keep the caret, clamped to the converted block's length (a heading drops hard breaks, a code block joins the text). The surface clamps on its side too. */
+function clampSelection(sel: TextSelection, steps: Step[], ctx: CommandContext): EditorSelection {
+    const step = steps.find((s) => s.type === 'replaceBlock' && s.key === sel.anchor.key);
+    if (!step || step.type !== 'replaceBlock') return sel;
+    const len = lengthOf(step.node, ctx);
     return { mode: 'text', anchor: { key: sel.anchor.key, offset: Math.min(sel.anchor.offset, len) }, head: { key: sel.head.key, offset: Math.min(sel.head.offset, len) } };
 }
 

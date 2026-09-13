@@ -1,9 +1,9 @@
 /**
- * `shikiCodeBlock()` — a `code` slot for the DOM component map that renders
- * fenced blocks through a {@link CodeHighlighter} inside the default
+ * `highlightedCodeBlock()` — a `code` slot for the DOM component map that
+ * renders fenced blocks through a {@link CodeHighlighter} inside the default
  * `<CodeBlock>` chrome.
  *
- * The slot yields a `<ShikiCode>` component vnode, so the render engine
+ * The slot yields a `<HighlightedCode>` component vnode, so the render engine
  * stamps the block key on it and the instance — its tokens, its pending
  * highlight — survives a streaming re-render. While a fence is still open
  * the highlight is debounced (`debounceMs`, default 120 ms) so an AI token
@@ -20,10 +20,11 @@
 import { watch } from '@sigx/reactivity';
 import { component, type Define, type JSXElement } from '@sigx/runtime-core';
 import type {} from '@sigx/runtime-dom';
-import { CodeBlock, type DomMarkdownComponents } from '../dom/index.js';
+import { CodeBlock } from './code-block.js';
+import type { DomComponents } from './components.js';
 import type { CodeHighlighter, HighlightedToken } from './highlighter.js';
 
-export interface ShikiCodeBlockOptions {
+export interface HighlightedCodeBlockOptions {
     /** Delay before highlighting an unterminated (streaming) fence. Default `120`. `0` highlights immediately. */
     debounceMs?: number;
     /** Forwarded to `<CodeBlock>`: adds `<prefix>-<part>` classes next to the data attributes. */
@@ -34,7 +35,7 @@ export interface ShikiCodeBlockOptions {
 
 export const DEFAULT_DEBOUNCE_MS = 120;
 
-type ShikiCodeProps =
+type HighlightedCodeProps =
     & Define.Prop<'value', string, true>
     & Define.Prop<'lang', string | null>
     & Define.Prop<'meta', string | null>
@@ -87,7 +88,7 @@ function renderLines(lines: HighlightedToken[][]): JSXElement {
     );
 }
 
-const ShikiCode = component<ShikiCodeProps>(({ props, signal, onUnmounted }) => {
+const HighlightedCode = component<HighlightedCodeProps>(({ props, signal, onUnmounted }) => {
     // Results live outside the signal (token arrays are not worth a deep
     // proxy); `version` is bumped to re-render.
     const version = signal(0);
@@ -168,20 +169,19 @@ const ShikiCode = component<ShikiCodeProps>(({ props, signal, onUnmounted }) => 
 });
 
 /**
- * Build a `code` renderer for `MarkdownView`'s `components` that highlights
- * through `highlighter`.
+ * Build a `code` renderer for the DOM component map that highlights through
+ * `highlighter`.
  *
  * @example
  * ```tsx
- * const highlighter = createShikiHighlighter();
- * const components = { code: shikiCodeBlock(highlighter) };
- * <MarkdownView value={text} components={components} />
+ * const code = highlightedCodeBlock(myHighlighter);
+ * <RichTextView value={text} components={{ code }} />
  * ```
  */
-export function shikiCodeBlock(highlighter: CodeHighlighter, options: ShikiCodeBlockOptions = {}): DomMarkdownComponents['code'] {
+export function highlightedCodeBlock(highlighter: CodeHighlighter, options: HighlightedCodeBlockOptions = {}): DomComponents['code'] {
     const { debounceMs, classPrefix, copyButton } = options;
     return ({ value, lang, meta, open }) => (
-        <ShikiCode
+        <HighlightedCode
             value={value}
             lang={lang}
             meta={meta}

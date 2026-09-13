@@ -9,6 +9,7 @@
 
 import type { Position } from '../ast/index.js';
 import type { InlineSyntaxExtension, MarkdownPlugin } from '../plugin/index.js';
+import type { NodeSpec } from '../schema/index.js';
 
 /**
  * The mention node. Register it in your app to type it as phrasing content and
@@ -51,9 +52,24 @@ export function serializeMention(node: Mention): string {
     return `@[${node.label.replace(/[\]\r\n]/g, '')}](${node.id.replace(/[)\r\n]/g, '')})`;
 }
 
-/** The mention plugin: syntax + serializer. Pair it with a `mention` component per platform. */
+/** The mention node spec: an atom whose attrs are `id` and `label`; renders as `@label` without a component. */
+export const mentionNode: NodeSpec = {
+    type: 'mention',
+    role: 'atom',
+    inline: {
+        toFlat: (node) => {
+            const m = node as unknown as Mention;
+            return { id: m.id, label: m.label };
+        },
+        fromFlat: (span) => ({ type: 'mention', id: span.attrs?.id ?? '', label: span.attrs?.label ?? '' }) as unknown as Mention as never,
+    },
+    text: (node) => `@${(node as unknown as Mention).label}`,
+};
+
+/** The mention plugin: node spec, syntax and serializer. Pair it with a `mention` component per platform. */
 export const mentionPlugin: MarkdownPlugin = {
     name: 'mention',
+    nodes: [mentionNode],
     inline: [mentionSyntax],
     serialize: { mention: (node: Mention) => serializeMention(node) },
 };

@@ -67,6 +67,44 @@ export interface BlockMenuEntry {
     create(): BlockContent;
 }
 
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+
+/** A renderable child: an element of the renderer's type or a raw string (for text). */
+export type RenderChild<E> = E | string;
+
+/** Document-wide facts a render pass collects before rendering (`collect` hooks fill it; `definitions` for CommonMark references). */
+export type RenderEnv = Record<string, unknown>;
+
+/** What a spec's `props` hook sees of the node's surroundings. */
+export interface PropsContext {
+    /** The node's parent (`undefined` when rendering detached phrasing content). */
+    parent?: Node;
+    /** Index in the parent's children. */
+    index: number;
+    /** Ancestors from the outermost down to `parent`, each with the index it has in its own parent (`-1` for the root). */
+    ancestors: readonly { node: Node; index: number }[];
+    env: RenderEnv;
+    sanitizeUrl(url: string, kind: 'link' | 'image'): string;
+    /** The render context's link handler, forwarded to link-like components. */
+    onLink?: unknown;
+}
+
+/** What a spec's `render` hook can do — render children, reach components, resolve the env. */
+export interface NodeRenderApi<E> {
+    component(type: string): ((props: Record<string, unknown>) => RenderChild<E> | null | undefined) | undefined;
+    /** Render phrasing content (index-keyed). */
+    renderInline(nodes: readonly Node[]): RenderChild<E>[];
+    /** Render blocks with `<parentKey>.<i>` path keys. */
+    renderBlocks(nodes: readonly Node[], parentKey: string): RenderChild<E>[];
+    /** A text child through the `text` component (or the raw string without one). */
+    text(value: string): RenderChild<E>;
+    sanitizeUrl(url: string, kind: 'link' | 'image'): string;
+    onLink?: unknown;
+    env: RenderEnv;
+}
+
 export interface NodeSpec<N extends Node = Node> {
     type: string;
     role: NodeRole;
@@ -92,6 +130,22 @@ export interface NodeSpec<N extends Node = Node> {
     menu?: BlockMenuEntry;
     /** Phrasing roles: the flat-model mapping. */
     inline?: InlineFlatSpec<N>;
+    // -- rendering --
+    /** Extra props for the node's component beyond `node` and `children` (a heading's `depth`, a list item's `number`, a link's sanitised `url`). */
+    props?(node: N, ctx: PropsContext): Record<string, unknown>;
+    /**
+     * Render the node by hand instead of through its component — the escape
+     * hatch for nodes that resolve against the env (references) or expand to
+     * several pieces. Return `null` to fall through to the default path.
+     * `key` is the block key, or `null` in inline position.
+     */
+    render?<E>(node: N, api: NodeRenderApi<E>, key: string | null): RenderChild<E>[] | null;
+    /** Plain-text projection: what the node renders as when no component exists for it. */
+    text?(node: N): string;
+    /** Fold document-wide facts into the render env before rendering (a definition registers its label). */
+    collect?(node: N, env: RenderEnv): void;
+    /** The component may return a plain string — the node needs no element of its own (raw HTML rendered as text). Silences the string-block warning. */
+    textOutput?: boolean;
 }
 
 export interface Schema {

@@ -137,14 +137,21 @@ export interface BlockTransformContext {
 // Components (per platform, augmented by `./dom` and the Lynx package)
 // ---------------------------------------------------------------------------
 
+/** A platform component map as a plugin ships it: node type → render function (the platform types the props). */
+// oxlint-disable-next-line no-explicit-any
+export type PlatformComponentMap = { readonly [type: string]: ((props: any) => unknown) | undefined };
+
 /**
- * Platform component maps a plugin may ship renderers for. Empty here; the
- * DOM entry augments it with `dom`, `@sigx/lynx-markdown` with `lynx`, a
- * terminal renderer with `terminal`. A plugin carrying both `dom` and `lynx`
- * renderers only bundles the one the app imports.
+ * Renderers a plugin ships per platform: `dom` for `@sigx/markdown/dom`
+ * (merged into `<RichTextView>`'s component map), `lynx` for
+ * `@sigx/lynx-markdown`, `terminal` for a terminal renderer. A plugin carrying
+ * several only bundles the one the app imports.
  */
-// oxlint-disable-next-line no-empty-interface
-export interface MarkdownPlatformComponents {}
+export interface MarkdownPlatformComponents {
+    dom?: PlatformComponentMap;
+    lynx?: PlatformComponentMap;
+    terminal?: PlatformComponentMap;
+}
 
 // ---------------------------------------------------------------------------
 // The plugin

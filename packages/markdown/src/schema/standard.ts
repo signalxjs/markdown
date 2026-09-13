@@ -2,9 +2,14 @@
  * The standard vocabulary — one spec per mdast node type the core owns.
  * Formats are codecs into and out of this tree; a format that needs more
  * (CommonMark's reference definitions, raw HTML) registers its own specs.
+ *
+ * Each spec also says what its component receives beyond `node` and
+ * `children` (`props`): a heading's `depth`, a list item's `number`, a
+ * table cell's `align`, a link's sanitised `url` — so the render engine has
+ * no per-type code.
  */
 
-import type { BlockContent, HeadingDepth, Image, Link, Literal, Parent, PhrasingContent } from '../ast/index.js';
+import type { AlignType, BlockContent, Code, Heading, HeadingDepth, Image, Link, List, ListItem, Literal, Parent, PhrasingContent, Table } from '../ast/index.js';
 import { createSchema, inlineAttrsOf, type NodeSpec, type Schema } from './spec.js';
 
 /** The text a block gets when phrasing content becomes a literal (code from a paragraph): values, alt text, newlines for breaks. */
@@ -29,13 +34,22 @@ export function paragraphOf(text: string): BlockContent {
     return { type: 'paragraph', children: text ? [{ type: 'text', value: text }] : [] };
 }
 
+/** A table's `align`, one entry per column, padded with `null` to the widest row. */
+export function tableAlign(table: Table): AlignType[] {
+    let width = table.align?.length ?? 0;
+    for (const row of table.children) width = Math.max(width, row.children.length);
+    const align: AlignType[] = [];
+    for (let i = 0; i < width; i++) align.push(table.align?.[i] ?? null);
+    return align;
+}
+
 export const standardNodes: readonly NodeSpec[] = [
     {
         type: 'paragraph',
         role: 'textblock',
         allowsHardBreak: true,
         fromInline: (children) => ({ type: 'paragraph', children }),
-        toInline: (node) => ((node as Parent).children as PhrasingContent[]),
+        toInline: (node) => (node as Parent).children as PhrasingContent[],
         menu: { label: 'Text', icon: 'pilcrow', group: 'basic', keywords: ['paragraph', 'text'], create: () => paragraphOf('') },
     },
     {
@@ -43,8 +57,9 @@ export const standardNodes: readonly NodeSpec[] = [
         role: 'textblock',
         splitsTo: 'paragraph',
         fromInline: (children, attrs) => ({ type: 'heading', depth: headingDepth(attrs?.depth), children: children.filter((c) => c.type !== 'break') }),
-        toInline: (node) => ((node as Parent).children as PhrasingContent[]),
+        toInline: (node) => (node as Parent).children as PhrasingContent[],
         menu: { label: 'Heading', icon: 'heading', group: 'basic', keywords: ['title', 'h1', 'h2', 'h3'], create: () => ({ type: 'heading', depth: 1, children: [] }) },
+        props: (node) => ({ depth: (node as Heading).depth }),
     },
     {
         // A cell is edited like a paragraph but is never a conversion target:
@@ -52,7 +67,12 @@ export const standardNodes: readonly NodeSpec[] = [
         // table commands), so `setBlockType('tableCell')` is refused.
         type: 'tableCell',
         role: 'textblock',
-        toInline: (node) => ((node as Parent).children as PhrasingContent[]),
+        toInline: (node) => (node as Parent).children as PhrasingContent[],
+        props: (_node, ctx) => {
+            const row = ctx.ancestors[ctx.ancestors.length - 1];
+            const table = ctx.ancestors[ctx.ancestors.length - 2]?.node as Table | undefined;
+            return { header: row?.index === 0, align: table?.align?.[ctx.index] ?? null, index: ctx.index };
+        },
     },
     {
         type: 'code',
@@ -64,6 +84,10 @@ export const standardNodes: readonly NodeSpec[] = [
         },
         fromInline: (children, attrs) => ({ type: 'code', lang: (attrs?.lang as string | null) ?? null, meta: null, value: phrasingToText(children) }),
         menu: { label: 'Code block', icon: 'code', group: 'basic', keywords: ['code', 'fence', 'snippet'], create: () => ({ type: 'code', lang: null, meta: null, value: '' }) },
+        props: (node) => {
+            const n = node as Code;
+            return { lang: n.lang ?? null, meta: n.meta ?? null, value: n.value, open: n.open === true };
+        },
     },
     {
         type: 'thematicBreak',
@@ -80,8 +104,23 @@ export const standardNodes: readonly NodeSpec[] = [
         type: 'list',
         role: 'container',
         menu: { label: 'Bulleted list', icon: 'list', group: 'basic', keywords: ['bullet', 'list', 'ul'], create: () => ({ type: 'list', ordered: false, spread: false, children: [{ type: 'listItem', spread: false, children: [paragraphOf('')] }] }) },
+        props: (node) => {
+            const n = node as List;
+            return { ordered: !!n.ordered, start: n.start ?? 1, spread: !!n.spread };
+        },
     },
-    { type: 'listItem', role: 'container', fillsWith: 'paragraph' },
+    {
+        type: 'listItem',
+        role: 'container',
+        fillsWith: 'paragraph',
+        props: (node, ctx) => {
+            const list = ctx.parent as List | undefined;
+            const item = node as ListItem;
+            const ordered = !!list?.ordered;
+            const start = list?.start ?? 1;
+            return { ordered, index: ctx.index, number: start + ctx.index, checked: item.checked ?? null, spread: !!item.spread };
+        },
+    },
     {
         type: 'table',
         role: 'table',
@@ -99,14 +138,15 @@ export const standardNodes: readonly NodeSpec[] = [
                 ],
             }),
         },
+        props: (node) => ({ align: tableAlign(node as Table) }),
     },
-    { type: 'tableRow', role: 'container' },
-    { type: 'text', role: 'inline' },
-    { type: 'break', role: 'inline', inline: { kind: 'break' } },
+    { type: 'tableRow', role: 'container', props: (_node, ctx) => ({ header: ctx.index === 0, index: ctx.index }) },
+    { type: 'text', role: 'inline', props: (node) => ({ value: (node as Literal).value }), text: (node) => (node as Literal).value },
+    { type: 'break', role: 'inline', inline: { kind: 'break' }, text: () => '\n' },
     { type: 'strong', role: 'mark', inline: { priority: 2 } },
     { type: 'emphasis', role: 'mark', inline: { priority: 3 } },
     { type: 'delete', role: 'mark', inline: { priority: 4 } },
-    { type: 'inlineCode', role: 'mark', inline: { literal: true, priority: 1 } },
+    { type: 'inlineCode', role: 'mark', inline: { literal: true, priority: 1 }, props: (node) => ({ value: (node as Literal).value }), text: (node) => (node as Literal).value },
     {
         type: 'link',
         role: 'mark',
@@ -125,6 +165,10 @@ export const standardNodes: readonly NodeSpec[] = [
                 return node;
             },
         },
+        props: (node, ctx) => {
+            const n = node as Link;
+            return { url: ctx.sanitizeUrl(n.url, 'link'), title: n.title ?? null, autolink: n.data?.autolink === true, onLink: ctx.onLink };
+        },
     },
     {
         type: 'image',
@@ -137,8 +181,14 @@ export const standardNodes: readonly NodeSpec[] = [
                 return node;
             },
         },
+        props: (node, ctx) => {
+            const n = node as Image;
+            return { url: ctx.sanitizeUrl(n.url, 'image'), alt: n.alt ?? '', title: n.title ?? null };
+        },
+        text: (node) => (node as Image).alt ?? '',
     },
 ];
 
 /** The schema of the standard vocabulary alone. */
 export const standardSchema: Schema = createSchema(standardNodes);
+

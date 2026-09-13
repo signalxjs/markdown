@@ -1,5 +1,5 @@
 /**
- * `createShikiHighlighter()` — a {@link CodeHighlighter} on top of `shiki`,
+ * `createShikiHighlighter()` — a `CodeHighlighter` (see `@sigx/markdown/dom`) on top of `shiki`,
  * which is an optional peer: the module is imported lazily on the first
  * `highlight()` call (or through the `load` option, so an app can hand in a
  * fine-grained bundle instead of the full `shiki` entry), a single
@@ -18,32 +18,7 @@
  * `[data-theme="dark"] [data-part="code-body"] span { color: var(--shiki-dark) }`.
  */
 
-/** One highlighted token: text plus the inline style it renders with. */
-export interface HighlightedToken {
-    content: string;
-    /** Foreground colour (the light theme's in dual-theme mode). */
-    color?: string;
-    /** Extra inline styles, e.g. dual-theme CSS variables (`--shiki-dark`). */
-    style?: Record<string, string>;
-}
-
-/** The highlighting contract a code-block component consumes. Implement it to plug in another engine. */
-export interface CodeHighlighter {
-    /**
-     * Synchronously return cached tokens for `(code, lang)`, or `null`. A
-     * language that needs no engine (`null`, `text`) or is known to be
-     * unavailable resolves synchronously to plain tokens.
-     */
-    peek(code: string, lang: string | null): HighlightedToken[][] | null;
-    /**
-     * Highlight (loading the engine and the grammar on demand); resolves to
-     * token lines. Never rejects: on any failure it resolves to plain-text
-     * tokens (one token per line, no colour).
-     */
-    highlight(code: string, lang: string | null): Promise<HighlightedToken[][]>;
-    /** Whether a language is (or can be) supported. */
-    supports?(lang: string): boolean;
-}
+import { plainTokens, type CodeHighlighter, type HighlightedToken } from '../dom/index.js';
 
 export interface ShikiThemes {
     light: string;
@@ -103,11 +78,6 @@ const DEFAULT_CACHE_SIZE = 200;
 
 /** Fence languages that mean "no highlighting" — never sent to shiki. */
 const PLAIN_LANGS: ReadonlySet<string> = new Set(['text', 'txt', 'plain', 'plaintext']);
-
-/** Plain-text tokens: one uncoloured token per line. */
-export function plainTokens(code: string): HighlightedToken[][] {
-    return code.split('\n').map((line) => [{ content: line }]);
-}
 
 /** The fence language normalised for lookup, or `null` when it means plain text. */
 function normalizeLang(lang: string | null | undefined): string | null {

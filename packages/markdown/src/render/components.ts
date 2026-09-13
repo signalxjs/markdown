@@ -3,13 +3,15 @@
  *
  * `renderDocument()` is generic over the element type `E` — a sigx VNode on
  * the web and on Lynx, a string or a layout node in a terminal renderer. A
- * platform supplies one {@link MarkdownComponents} map; the engine owns AST
- * recursion and reconciliation keys, so a component only decides *what
- * element to wrap its already-rendered `children` in*.
+ * platform supplies one {@link ComponentMap}; the engine owns AST recursion,
+ * the props each node type carries (from the schema) and reconciliation
+ * keys, so a component only decides *what element to wrap its
+ * already-rendered `children` in*.
  *
- * Block components (`paragraph`, `heading`, …, `tableCell`) must return an
- * element: the engine stamps the block's reconciliation key on it after it
- * returns, and a string cannot carry one. Inline components may return a
+ * Only `root` is required: a node type without a component renders its
+ * spec's `text` projection, else its children. Block components must return
+ * an element — the engine stamps the block's reconciliation key on it after
+ * it returns, and a string cannot carry one. Inline components may return a
  * plain string.
  */
 
@@ -40,14 +42,14 @@ import type {
     Text,
     ThematicBreak,
 } from '../ast/index.js';
+import type { RenderChild } from '../schema/index.js';
 
-/** A renderable child: an element or a raw string (for text). */
-export type MarkdownChild<E> = E | string;
+export type { RenderChild } from '../schema/index.js';
 
 /** The props every parent component receives: the node and its rendered children. */
 export interface NodeProps<E, N> {
     node: N;
-    children: MarkdownChild<E>[];
+    children: RenderChild<E>[];
 }
 
 export interface HeadingProps<E> extends NodeProps<E, Heading> {
@@ -118,9 +120,8 @@ export interface ImageProps {
     title: string | null;
 }
 
-/** The fixed slots — one per built-in node type. */
-export interface MarkdownComponentMap<E> {
-    root(p: { node: Root; children: MarkdownChild<E>[] }): E;
+/** The typed slots of the standard vocabulary (plus markdown's `html` and `definition`). */
+export interface StandardComponents<E> {
     paragraph(p: NodeProps<E, Paragraph>): E;
     heading(p: HeadingProps<E>): E;
     blockquote(p: NodeProps<E, Blockquote>): E;
@@ -132,17 +133,17 @@ export interface MarkdownComponentMap<E> {
     tableRow(p: TableRowProps<E>): E;
     tableCell(p: TableCellProps<E>): E;
     /** Raw HTML. The default DOM implementation renders it as literal text — no HTML sink. */
-    html(p: { node: Html; value: string }): MarkdownChild<E>;
-    /** A link reference definition. Default: renders nothing. */
-    definition?(p: { node: Definition }): MarkdownChild<E> | null;
-    text(p: { node: Text; value: string }): MarkdownChild<E>;
-    emphasis(p: NodeProps<E, Emphasis>): MarkdownChild<E>;
-    strong(p: NodeProps<E, Strong>): MarkdownChild<E>;
-    delete(p: NodeProps<E, Delete>): MarkdownChild<E>;
-    inlineCode(p: { node: InlineCode; value: string }): MarkdownChild<E>;
-    break(p: { node: Break }): MarkdownChild<E>;
-    link(p: LinkProps<E>): MarkdownChild<E>;
-    image(p: ImageProps): MarkdownChild<E>;
+    html(p: { node: Html; value: string }): RenderChild<E>;
+    /** A link reference definition. Without one, definitions render nothing. */
+    definition?(p: { node: Definition }): RenderChild<E> | null;
+    text(p: { node: Text; value: string }): RenderChild<E>;
+    emphasis(p: NodeProps<E, Emphasis>): RenderChild<E>;
+    strong(p: NodeProps<E, Strong>): RenderChild<E>;
+    delete(p: NodeProps<E, Delete>): RenderChild<E>;
+    inlineCode(p: { node: InlineCode; value: string }): RenderChild<E>;
+    break(p: { node: Break }): RenderChild<E>;
+    link(p: LinkProps<E>): RenderChild<E>;
+    image(p: ImageProps): RenderChild<E>;
 }
 
 /**
@@ -151,23 +152,23 @@ export interface MarkdownComponentMap<E> {
  *
  * ```ts
  * declare module '@sigx/markdown' {
- *     interface MarkdownPluginComponents<E> {
- *         mention(p: NodeProps<E, Mention>): MarkdownChild<E>;
+ *     interface PluginComponents<E> {
+ *         mention(p: NodeProps<E, Mention>): RenderChild<E>;
  *     }
  * }
  * ```
  */
 // oxlint-disable-next-line no-empty-interface, no-unused-vars
-export interface MarkdownPluginComponents<E> {}
+export interface PluginComponents<E> {}
 
-/** A renderer for a plugin node type: called with the node and its rendered children. */
+/** A renderer for a node type without a typed slot: called with the node, its rendered children and the spec's props. */
 // oxlint-disable-next-line no-explicit-any
-export type PluginComponent<E> = (p: any) => MarkdownChild<E> | null;
+export type PluginComponent<E> = (p: any) => RenderChild<E> | null;
 
 /**
- * Map of node type → render function. The fixed slots cover the built-in
- * node types; plugin node types are keyed by `node.type` (typed through
- * {@link MarkdownPluginComponents} when the plugin augments it).
+ * Map of node type → render function. `root` is required; the standard slots
+ * are typed and optional; plugin node types are keyed by `node.type` (typed
+ * through {@link PluginComponents} when the plugin augments it).
  */
-export type MarkdownComponents<E> = MarkdownComponentMap<E> &
-    Partial<MarkdownPluginComponents<E>> & { [pluginType: string]: PluginComponent<E> | undefined };
+export type ComponentMap<E> = { root(p: { node: Root; children: RenderChild<E>[] }): E } & Partial<StandardComponents<E>> &
+    Partial<PluginComponents<E>> & { [type: string]: PluginComponent<E> | undefined };

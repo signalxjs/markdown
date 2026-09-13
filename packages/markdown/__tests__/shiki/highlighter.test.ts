@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { plainTokens } from '../../src/dom/index.js';
 import {
     createShikiHighlighter,
     DEFAULT_LANGS,
-    plainTokens,
     type ShikiHighlighterLike,
     type ShikiModule,
     type ShikiTokenLike,
