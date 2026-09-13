@@ -7,8 +7,7 @@
  * Platform-neutral; a DOM chip renderer comes from `@sigx/markdown/editor/dom`.
  */
 
-import { mentionPlugin, type Mention } from '../plugins/index.js';
-import type { NodeSpec } from '../schema/index.js';
+import { mentionPlugin } from '../plugins/index.js';
 import { ATOM_CHAR } from './inline-flat.js';
 import type { EditorPlugin } from './plugin.js';
 import type { TriggerItem, TriggerSpec } from './trigger/index.js';
@@ -29,19 +28,6 @@ export interface MentionPluginOptions {
     attrsOf?: (item: MentionItem) => Record<string, string>;
 }
 
-/** The mention node: an atom whose attrs are `id` and `label`. */
-export const mentionNode: NodeSpec = {
-    type: 'mention',
-    role: 'atom',
-    inline: {
-        toFlat: (node) => {
-            const m = node as unknown as Mention;
-            return { id: m.id, label: m.label };
-        },
-        fromFlat: (span) => ({ type: 'mention', id: span.attrs?.id ?? '', label: span.attrs?.label ?? '' }) as unknown as Mention as never,
-    },
-};
-
 export function createMentionPlugin(options: MentionPluginOptions): EditorPlugin {
     const trigger: TriggerSpec = {
         char: options.trigger ?? '@',
@@ -55,7 +41,6 @@ export function createMentionPlugin(options: MentionPluginOptions): EditorPlugin
     };
     return {
         ...mentionPlugin,
-        nodes: [mentionNode],
         editor: { triggers: [trigger] },
     };
 }

@@ -11,7 +11,7 @@
  * `data-scope` / `data-part` attributes for styling.
  *
  * On the server (and before mount) the same document renders through
- * `<MarkdownView>`, so SSR output is the read-only markup.
+ * `<RichTextView>`, so SSR output is the read-only markup.
  *
  * @example
  * ```tsx
@@ -25,7 +25,7 @@ import { component, mergeProps, type Define, type JSXElement } from '@sigx/runti
 import type {} from '@sigx/runtime-dom';
 import { defineProvide } from '@sigx/runtime-core';
 import type { Root } from '../../ast/index.js';
-import { createDomComponents, MarkdownView, type DomMarkdownComponents } from '../../dom/index.js';
+import { createDomComponents, RichTextView, type DomComponents } from '../../dom/index.js';
 import { parseMarkdown } from '../../parser/index.js';
 import type { MarkdownPlugin } from '../../plugin/index.js';
 import { toMarkdown } from '../../serializer/index.js';
@@ -83,7 +83,7 @@ export type MarkdownEditorProps = Define.WithAttrs<
     /** Plugins (syntax, serializer, components and editor slices). Captured at mount. */
     & Define.Prop<'plugins', readonly MarkdownPlugin[]>
     /** Components for void blocks and the SSR/read-only rendering (overrides of the default DOM map). */
-    & Define.Prop<'components', Partial<DomMarkdownComponents>>
+    & Define.Prop<'components', Partial<DomComponents>>
     /** Extra atom renderers by node type (images, mentions, plugin atoms). */
     & Define.Prop<'atoms', Record<string, AtomRenderer>>
     /** `true` / `'top'` renders the toolbar above the content, `'bottom'` below, `false` none. Default `true`. */
@@ -159,7 +159,7 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
     for (const [type, render] of Object.entries(props.atoms ?? {})) atoms.set(type, render);
 
     const defaults = createDomComponents({});
-    const components = (): DomMarkdownComponents => (props.components ? { ...defaults, ...props.components } : defaults);
+    const components = (): DomComponents => (props.components ? { ...defaults, ...props.components } : defaults);
 
     let view!: EditorView;
 
@@ -440,7 +440,7 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
             track(editor.rev.value);
             return (
                 <div {...rootAttrs} data-readonly="" data-ssr="">
-                    <MarkdownView root={editor.state.doc} plugins={plugins} components={props.components} />
+                    <RichTextView root={editor.state.doc} plugins={plugins} components={props.components} />
                 </div>
             );
         }

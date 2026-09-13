@@ -13,7 +13,7 @@ import type { Editor } from '../editor.js';
 import { selectedBlockKeys } from '../commands.js';
 import type { AnySurface } from '../surface.js';
 import type { AtomRenderer } from './inline-dom.js';
-import type { DomMarkdownComponents } from '../../dom/index.js';
+import type { DomComponents } from '../../dom/index.js';
 
 /** Read signals for dependency tracking only (a render that depends on `rev` without using its value). */
 export function track(..._values: unknown[]): void {}
@@ -43,7 +43,7 @@ export interface EditorView {
     /** Whether block handles render. */
     handles(): boolean;
     /** The read-only component map void blocks render with. */
-    components(): DomMarkdownComponents;
+    components(): DomComponents;
     /** Focus the surface of a block (a no-op when it is not mounted). */
     focusBlock(key: string, target?: { edge: 'start' | 'end' } | { offset: number }): boolean;
     /** Move keyboard focus to the editor root (block selections live there). */
@@ -69,7 +69,7 @@ export interface CreateViewOptions {
     readOnly(): boolean;
     placeholder(): string | undefined;
     handles(): boolean;
-    components(): DomMarkdownComponents;
+    components(): DomComponents;
 }
 
 export function createEditorView(opts: CreateViewOptions): EditorView {

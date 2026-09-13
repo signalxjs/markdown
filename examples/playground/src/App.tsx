@@ -11,12 +11,12 @@ import {
     parseMarkdown,
     toJSON,
     toMarkdown,
-    type MarkdownChild,
+    type RenderChild,
     type MarkdownPlugin,
     type Mention,
     type NodeProps
 } from '@sigx/markdown';
-import { MarkdownView, type DomMarkdownComponents } from '@sigx/markdown/dom';
+import { RichTextView, highlightedCodeBlock, type DomComponents } from '@sigx/markdown/dom';
 import { createSlashPlugin } from '@sigx/markdown/editor';
 import { MarkdownEditor, createDomMentionPlugin } from '@sigx/markdown/editor/dom';
 
@@ -28,7 +28,7 @@ declare module '@sigx/markdown' {
         mention: Mention;
     }
     interface MarkdownPluginComponents<E> {
-        mention(p: NodeProps<E, Mention>): MarkdownChild<E>;
+        mention(p: NodeProps<E, Mention>): RenderChild<E>;
     }
 }
 
@@ -74,7 +74,7 @@ export function greet(name: string): string {
 | Entry | Runs on | Notes |
 |:------|:-------:|------:|
 | \`.\` | everywhere | parser, serializer, engine |
-| \`./dom\` | web | \`MarkdownView\` |
+| \`./dom\` | web | \`RichTextView\` |
 | \`./shiki\` | web | optional highlighting |
 
 ---
@@ -110,7 +110,7 @@ const MentionChip = ({ node }: NodeProps<JSXElement, Mention>): JSXElement => (
     </span>
 );
 
-type CodeSlot = DomMarkdownComponents['code'];
+type CodeSlot = DomComponents['code'];
 
 export const App = component(({ signal, onUnmounted }) => {
     const state = signal({
@@ -132,8 +132,8 @@ export const App = component(({ signal, onUnmounted }) => {
     let shikiLoading: Promise<void> | null = null;
 
     const loadShiki = (): Promise<void> => {
-        shikiLoading ??= import('@sigx/markdown/shiki').then(({ createShikiHighlighter, shikiCodeBlock }) => {
-            shikiCode = shikiCodeBlock(createShikiHighlighter());
+        shikiLoading ??= import('@sigx/markdown/shiki').then(({ createShikiHighlighter }) => {
+            shikiCode = highlightedCodeBlock(createShikiHighlighter());
             state.shikiReady = true;
         });
         return shikiLoading;
@@ -152,8 +152,8 @@ export const App = component(({ signal, onUnmounted }) => {
     // ---- View inputs ----
     const plugins = computed<readonly MarkdownPlugin[]>(() => (state.mention ? WITH_MENTION : NO_PLUGINS));
 
-    const components = computed<Partial<DomMarkdownComponents>>(() => {
-        const slots: Partial<DomMarkdownComponents> = { mention: MentionChip };
+    const components = computed<Partial<DomComponents>>(() => {
+        const slots: Partial<DomComponents> = { mention: MentionChip };
         if (state.shiki && state.shikiReady && shikiCode) slots.code = shikiCode;
         return slots;
     });
@@ -322,7 +322,7 @@ export const App = component(({ signal, onUnmounted }) => {
                 <section class="pane">
                     <h2>View</h2>
                     <div class="body">
-                        <MarkdownView
+                        <RichTextView
                             id="static"
                             value={state.source}
                             plugins={plugins.value}
@@ -336,7 +336,7 @@ export const App = component(({ signal, onUnmounted }) => {
                 <section class="pane">
                     <h2>Streamed</h2>
                     <div class="body">
-                        <MarkdownView
+                        <RichTextView
                             id="streamed"
                             value={stream.value.value}
                             plugins={plugins.value}

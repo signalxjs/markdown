@@ -11,8 +11,8 @@ block-tree editor. Zero dependencies, no `node:` imports.
 |---|---|
 | `@sigx/markdown` | the AST, `parseMarkdown`, `createIncrementalEngine`, `toMarkdown`, `toJSON` / `fromJSON`, `createMarkdownStream`, `renderDocument`, the `MarkdownPlugin` contract, `mentionPlugin` |
 | `@sigx/markdown/testing` | `strip()`, `toHtml()`, `feed()` — helpers for tests that parse, stream or render |
-| `@sigx/markdown/dom` | `MarkdownView` for the web, the default DOM components (`data-scope` / `data-part` styling seam) and the `CodeBlock` chrome |
-| `@sigx/markdown/shiki` | `createShikiHighlighter()` + `shikiCodeBlock()` — optional Shiki highlighting for code blocks (`shiki` is an optional peer) |
+| `@sigx/markdown/dom` | `RichTextView` for the web, the default DOM components (`data-scope` / `data-part` styling seam), the `CodeBlock` chrome, the `CodeHighlighter` contract and `highlightedCodeBlock()` |
+| `@sigx/markdown/shiki` | `createShikiHighlighter()` + `shikiPlugin()` — Shiki behind the `CodeHighlighter` contract (`shiki` is an optional peer) |
 | `@sigx/markdown/editor` | the block-tree editor core: `createEditor()`, state, steps, history, commands, keymap, input rules, triggers, toolbar items and the `InlineSurface` / `CodeSurface` contracts a platform implements |
 | `@sigx/markdown/editor/dom` | `MarkdownEditor` for the web: `contenteditable` block surfaces, toolbar, block menu, slash commands, mentions, two-way `markdown` / `document` models, `data-scope` / `data-part` styling |
 
@@ -44,12 +44,12 @@ Streaming: `createMarkdownStream({ flushIntervalMs: 16 })` coalesces tokens
 into one signal write per frame; pass `stream.value.value` to a view.
 
 ```tsx
-import { MarkdownView } from '@sigx/markdown/dom';
-import { createShikiHighlighter, shikiCodeBlock } from '@sigx/markdown/shiki';
+import { RichTextView } from '@sigx/markdown/dom';
+import { shikiPlugin } from '@sigx/markdown/shiki';
 
-const code = shikiCodeBlock(createShikiHighlighter());
+const plugins = [shikiPlugin()];
 
-<MarkdownView value={stream.value.value} components={{ code }} onLink={(url) => router.push(url)} />
+<RichTextView value={stream.value.value} plugins={plugins} onLink={(url) => router.push(url)} />
 ```
 
 Every element carries `data-scope="markdown"` and `data-part="heading"`,

@@ -1,49 +1,36 @@
 /**
- * The render engine: walks an mdast tree and dispatches every node to a
- * {@link MarkdownComponents} renderer. Platform-free — generic over the
- * element type `E` and free of any runtime import, so the same engine drives
- * the DOM view, Lynx and a terminal renderer.
+ * The render engine: walks a tree and dispatches every node to a
+ * {@link ComponentMap} renderer, driven by the schema. Platform-free —
+ * generic over the element type `E` and free of any runtime import, so the
+ * same engine drives the DOM view, Lynx and a terminal renderer; format-free —
+ * it has no per-type code, every node type is described by its `NodeSpec`
+ * (role, props, an optional `render` escape hatch, a `text` projection).
  *
  * What the engine keeps for itself (so components stay simple and a design
  * system cannot break streaming by accident):
- *  - AST recursion — children are fully rendered before a component is called.
+ *  - AST recursion — children are fully rendered before a component is called
+ *    (inline children for text blocks and marks, keyed blocks for containers);
  *  - Reconciliation keys — stamped on the element *after* the component
  *    returns: `node.key`, or a positional path key (`b-<i>` / `<parent>.<i>`,
  *    see `ast/keys.ts`) for a keyless tree, so a finalized block never
  *    remounts whatever element the component chose. Inline children get
  *    their index as key; strings are never touched.
- *  - Reference resolution, URL sanitisation and the plugin fallbacks.
+ *  - The render env — `collect` hooks run over the document first (CommonMark
+ *    definitions), `render` hooks resolve against it.
  */
 
 import { childKey, topKey } from '../ast/index.js';
-import { collectDefinitions } from '../document/index.js';
-import type {
-    AlignType,
-    BlockContent,
-    Definition,
-    ImageReference,
-    Keyed,
-    LinkReference,
-    List,
-    Literal,
-    Node,
-    Parent,
-    PhrasingContent,
-    Root,
-    RootContent,
-    Table,
-    Text,
-} from '../ast/index.js';
-import type { ResolvedPlugins, SerializeContext } from '../plugin/index.js';
-import type { LinkHandler, MarkdownChild, MarkdownComponents } from './components.js';
+import type { BlockContent, Keyed, Node, Parent, PhrasingContent, Root, Text } from '../ast/index.js';
+import type { NodeRenderApi, NodeSpec, PropsContext, RenderChild, RenderEnv, Schema } from '../schema/index.js';
+import type { ComponentMap, LinkHandler } from './components.js';
 import { sanitizeUrl as defaultSanitizeUrl, type UrlKind } from './sanitize.js';
 
 export interface RenderContext<E> {
-    components: MarkdownComponents<E>;
-    /** Reference definitions to resolve against. Default: `collectDefinitions(root)` per call. */
-    definitions?: ReadonlyMap<string, Definition>;
-    /** Resolved plugins — their `serialize` rules are the fallback for a plugin node without a component. */
-    plugins?: ResolvedPlugins;
+    components: ComponentMap<E>;
+    /** The schema: what every node type is and what its component receives. */
+    schema: Schema;
+    /** The render env. Default: collected from the tree through the specs' `collect` hooks (`renderDocument`, `renderBlock`); empty for `renderInline`. */
+    env?: RenderEnv;
     /** Passed to `link` components as `onLink`. */
     onLink?: LinkHandler;
     /** URL sanitiser for links and images. Default: `sanitizeUrl` from `./sanitize.js`. */
@@ -59,9 +46,9 @@ export interface RenderContext<E> {
 
 /** Render a whole document: every top-level block, wrapped in `components.root`. */
 export function renderDocument<E>(root: Root, ctx: RenderContext<E>): E {
-    const eng = createEngine(ctx, ctx.definitions ?? collectDefinitions(root));
-    const children: MarkdownChild<E>[] = [];
-    root.children.forEach((child, i) => renderBlockNode(child, eng, topKey(i), children));
+    const eng = createEngine(ctx, ctx.env ?? collectEnv(root, ctx.schema), root);
+    const children: RenderChild<E>[] = [];
+    root.children.forEach((child, i) => renderBlockNode(child, eng, topKey(i), i, children));
     return eng.C.root({ node: root, children });
 }
 
@@ -69,13 +56,14 @@ export function renderDocument<E>(root: Root, ctx: RenderContext<E>): E {
  * Render one block — for consumers rendering a subset (a per-block memoised
  * view). `key` is the positional key used when the node carries none, and the
  * parent key of its descendants. `null` when the block renders to nothing (a
- * `definition` without a component). Definitions default to those found
- * inside the block itself; pass `ctx.definitions` to resolve document-wide.
+ * `definition` without a component). The env defaults to what the block
+ * itself collects; pass `ctx.env` to resolve document-wide.
  */
 export function renderBlock<E>(node: BlockContent, ctx: RenderContext<E>, key: string): E | null {
-    const eng = createEngine(ctx, ctx.definitions ?? collectDefinitions({ type: 'root', children: [node] }));
-    const out: MarkdownChild<E>[] = [];
-    renderBlockNode(node, eng, key, out);
+    const root: Root = { type: 'root', children: [node] };
+    const eng = createEngine(ctx, ctx.env ?? collectEnv(root, ctx.schema), root);
+    const out: RenderChild<E>[] = [];
+    renderBlockNode(node, eng, key, 0, out);
     if (__DEV__ && out.length > 1) {
         console.warn(
             `[@sigx/markdown] renderBlock: a "${node.type}" node without a component expanded to ${out.length} elements; only the first is returned. Use renderDocument() or register a component.`,
@@ -84,9 +72,40 @@ export function renderBlock<E>(node: BlockContent, ctx: RenderContext<E>, key: s
     return out.length > 0 ? (out[0] as E) : null;
 }
 
-/** Render a run of phrasing content (index-keyed). Definitions default to none unless `ctx.definitions` is set. */
-export function renderInline<E>(nodes: PhrasingContent[], ctx: RenderContext<E>): MarkdownChild<E>[] {
-    return renderInlineNodes(nodes, createEngine(ctx, ctx.definitions ?? EMPTY_DEFINITIONS));
+/** Render a run of phrasing content (index-keyed). The env is empty unless `ctx.env` is set. */
+export function renderInline<E>(nodes: PhrasingContent[], ctx: RenderContext<E>): RenderChild<E>[] {
+    return renderInlineNodes(nodes, createEngine(ctx, ctx.env ?? {}, undefined));
+}
+
+/**
+ * Run every spec's `collect` hook over the root and its containers' descendants
+ * (block level only — O(blocks), not O(inline nodes)) and return the env.
+ */
+export function collectEnv(root: Root, schema: Schema): RenderEnv {
+    const env: RenderEnv = {};
+    const walk = (node: Node): void => {
+        schema.get(node.type)?.collect?.(node, env);
+        if (node !== root && !schema.isContainer(node.type)) return;
+        const children = (node as Parent).children;
+        if (!children) return;
+        for (const child of children) walk(child);
+    };
+    walk(root);
+    return env;
+}
+
+/**
+ * The schema types a component map leaves unrendered: no component, no
+ * `render` hook and no `text` projection — they would fall back to their
+ * children with a dev warning. A design-system sanity check.
+ */
+export function missingComponents<E>(schema: Schema, components: ComponentMap<E>): string[] {
+    const out: string[] = [];
+    for (const spec of schema.specs.values()) {
+        if (components[spec.type] || spec.render || spec.text) continue;
+        out.push(spec.type);
+    }
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,195 +113,94 @@ export function renderInline<E>(nodes: PhrasingContent[], ctx: RenderContext<E>)
 // ---------------------------------------------------------------------------
 
 interface Engine<E> {
-    C: MarkdownComponents<E>;
-    definitions: ReadonlyMap<string, Definition>;
-    plugins: ResolvedPlugins | undefined;
+    C: ComponentMap<E>;
+    schema: Schema;
+    env: RenderEnv;
     onLink: LinkHandler | undefined;
     sanitize: (url: string, kind: UrlKind) => string;
     /** Stamps `key` on `el`; a no-op for strings and nothing. */
-    stamp: (el: MarkdownChild<E> | null | undefined, key: string) => void;
+    stamp: (el: RenderChild<E> | null | undefined, key: string) => void;
     /** Whether the default (VNode `.key`) stamping is in use — gates the string-block dev warning. */
     defaultStamp: boolean;
+    /** The ancestors of the node being rendered, outermost first, each with its index in its own parent. */
+    stack: { node: Node; index: number }[];
 }
-
-const EMPTY_DEFINITIONS: ReadonlyMap<string, Definition> = new Map();
 
 function defaultStampKey(el: unknown, key: string): void {
     (el as { key?: string }).key = key;
 }
 
-function createEngine<E>(ctx: RenderContext<E>, definitions: ReadonlyMap<string, Definition>): Engine<E> {
+function createEngine<E>(ctx: RenderContext<E>, env: RenderEnv, root: Root | undefined): Engine<E> {
     const stampKey = ctx.stampKey ?? defaultStampKey;
     return {
         C: ctx.components,
-        definitions,
-        plugins: ctx.plugins,
+        schema: ctx.schema,
+        env,
         onLink: ctx.onLink,
         sanitize: ctx.sanitizeUrl ?? defaultSanitizeUrl,
         stamp: (el, key) => {
             if (el != null && typeof el !== 'string') stampKey(el as E, key);
         },
         defaultStamp: ctx.stampKey === undefined,
+        stack: root ? [{ node: root, index: -1 }] : [],
     };
 }
 
+function textNode(value: string): Text {
+    return { type: 'text', value };
+}
+
+function renderApi<E>(eng: Engine<E>): NodeRenderApi<E> {
+    return {
+        component: (type) => eng.C[type] as ((props: Record<string, unknown>) => RenderChild<E> | null | undefined) | undefined,
+        renderInline: (nodes) => renderInlineNodes(nodes, eng),
+        renderBlocks: (nodes, parentKey) => renderBlocks(nodes, eng, parentKey),
+        text: (value) => textChild(value, eng),
+        sanitizeUrl: eng.sanitize,
+        onLink: eng.onLink,
+        env: eng.env,
+    };
+}
+
+/** A text child through the `text` component, or the raw string without one. */
+function textChild<E>(value: string, eng: Engine<E>): RenderChild<E> {
+    const text = eng.C.text;
+    return text ? text({ node: textNode(value), value }) : value;
+}
+
 // ---------------------------------------------------------------------------
-// Blocks
+// Dispatch
 // ---------------------------------------------------------------------------
 
-/** Slots typed to return an element (not a string) — a string there cannot carry a key. */
-const ELEMENT_SLOTS: ReadonlySet<string> = new Set([
-    'paragraph',
-    'heading',
-    'thematicBreak',
-    'blockquote',
-    'list',
-    'listItem',
-    'code',
-    'table',
-    'tableRow',
-    'tableCell',
-]);
-
-const INLINE_TYPES: ReadonlySet<string> = new Set([
-    'text',
-    'emphasis',
-    'strong',
-    'delete',
-    'inlineCode',
-    'break',
-    'link',
-    'image',
-    'linkReference',
-    'imageReference',
-]);
+const PHRASING_ROLES: ReadonlySet<string> = new Set(['inline', 'mark', 'atom']);
+const INLINE_CHILDREN_ROLES: ReadonlySet<string> = new Set(['textblock', 'mark']);
+/** Roles whose element must carry a key: a string return is a bug (unless the spec says `textOutput`). */
+const ELEMENT_ROLES: ReadonlySet<string> = new Set(['textblock', 'container', 'table', 'code', 'void']);
 
 /** Render a block container's children with `<parentKey>.<i>` path keys. */
-function renderBlocks<E>(nodes: readonly Node[], eng: Engine<E>, parentKey: string): MarkdownChild<E>[] {
-    const out: MarkdownChild<E>[] = [];
-    nodes.forEach((child, i) => renderBlockNode(child, eng, childKey(parentKey, i), out));
+function renderBlocks<E>(nodes: readonly Node[], eng: Engine<E>, parentKey: string): RenderChild<E>[] {
+    const out: RenderChild<E>[] = [];
+    nodes.forEach((child, i) => renderBlockNode(child, eng, childKey(parentKey, i), i, out));
     return out;
 }
 
 /**
  * Render one node in block position into `out`. Almost always exactly one
  * element; nothing for a skipped `definition`, and possibly several for a
- * plugin node that falls back to its children.
+ * node that falls back to its children. Phrasing content in block position
+ * (a plugin block whose children are inline) keeps its index key.
  */
-function renderBlockNode<E>(node: Node, eng: Engine<E>, pathKey: string, out: MarkdownChild<E>[]): void {
-    const key = (node as Keyed).key ?? pathKey;
-    const C = eng.C;
-    const n = node as RootContent;
-    let el: MarkdownChild<E> | null;
-    switch (n.type) {
-        case 'paragraph':
-            el = C.paragraph({ node: n, children: renderInlineNodes(n.children, eng) });
-            break;
-        case 'heading':
-            el = C.heading({ node: n, depth: n.depth, children: renderInlineNodes(n.children, eng) });
-            break;
-        case 'thematicBreak':
-            el = C.thematicBreak({ node: n });
-            break;
-        case 'blockquote':
-            el = C.blockquote({ node: n, children: renderBlocks(n.children, eng, key) });
-            break;
-        case 'list':
-            el = renderList(n, eng, key);
-            break;
-        case 'code':
-            el = C.code({ node: n, lang: n.lang ?? null, meta: n.meta ?? null, value: n.value, open: n.open === true });
-            break;
-        case 'html':
-            el = C.html({ node: n, value: n.value });
-            break;
-        case 'definition':
-            el = C.definition ? C.definition({ node: n }) : null;
-            break;
-        case 'table':
-            el = renderTable(n, eng, key);
-            break;
-        default:
-            // Inline content in block position (a plugin block whose children
-            // are phrasing content) keeps its index key; anything else is a
-            // plugin node.
-            if (INLINE_TYPES.has(n.type)) renderInlinePiece(n, eng, indexOf(pathKey), out);
-            else renderPluginNode(n, eng, key, out);
-            return;
+function renderBlockNode<E>(node: Node, eng: Engine<E>, pathKey: string, index: number, out: RenderChild<E>[]): void {
+    const role = eng.schema.role(node.type);
+    if (role && PHRASING_ROLES.has(role)) {
+        renderInlinePiece(node, eng, index, out);
+        return;
     }
-    if (el == null) return;
-    if (__DEV__ && typeof el === 'string' && ELEMENT_SLOTS.has(n.type)) warnStringBlock(n.type, eng);
-    eng.stamp(el, key);
-    out.push(el);
+    renderNode(node, eng, (node as Keyed).key ?? pathKey, index, out);
 }
 
-/** The index a path key was built from (`b-3` → 3, `b-3.2` → 2). */
-function indexOf(pathKey: string): number {
-    const i = pathKey.lastIndexOf('.');
-    return Number(i === -1 ? pathKey.slice(2) : pathKey.slice(i + 1)) || 0;
-}
-
-function renderList<E>(node: List, eng: Engine<E>, key: string): E {
-    const C = eng.C;
-    const ordered = !!node.ordered;
-    const start = node.start ?? 1;
-    const spread = !!node.spread;
-    const children = node.children.map((item, i) => {
-        const itemKey = item.key ?? childKey(key, i);
-        const li = C.listItem({
-            node: item,
-            ordered,
-            index: i,
-            number: start + i,
-            checked: item.checked ?? null,
-            spread: !!item.spread,
-            children: renderBlocks(item.children, eng, itemKey),
-        });
-        if (__DEV__ && typeof li === 'string') warnStringBlock('listItem', eng);
-        eng.stamp(li, itemKey);
-        return li;
-    });
-    return C.list({ node, ordered, start, spread, children });
-}
-
-function renderTable<E>(node: Table, eng: Engine<E>, key: string): E {
-    const C = eng.C;
-    const rows = node.children;
-    let width = node.align?.length ?? 0;
-    for (const row of rows) width = Math.max(width, row.children.length);
-    const align: AlignType[] = [];
-    for (let i = 0; i < width; i++) align.push(node.align?.[i] ?? null);
-
-    const children = rows.map((row, ri) => {
-        const rowKey = row.key ?? childKey(key, ri);
-        const header = ri === 0;
-        const cells = row.children.map((cell, ci) => {
-            const cellKey = cell.key ?? childKey(rowKey, ci);
-            const td = C.tableCell({
-                node: cell,
-                header,
-                align: align[ci] ?? null,
-                index: ci,
-                children: renderInlineNodes(cell.children, eng),
-            });
-            if (__DEV__ && typeof td === 'string') warnStringBlock('tableCell', eng);
-            eng.stamp(td, cellKey);
-            return td;
-        });
-        const tr = C.tableRow({ node: row, header, index: ri, children: cells });
-        if (__DEV__ && typeof tr === 'string') warnStringBlock('tableRow', eng);
-        eng.stamp(tr, rowKey);
-        return tr;
-    });
-    return C.table({ node, align, children });
-}
-
-// ---------------------------------------------------------------------------
-// Inline
-// ---------------------------------------------------------------------------
-
-function renderInlineNodes<E>(nodes: readonly Node[], eng: Engine<E>): MarkdownChild<E>[] {
-    const out: MarkdownChild<E>[] = [];
+function renderInlineNodes<E>(nodes: readonly Node[], eng: Engine<E>): RenderChild<E>[] {
+    const out: RenderChild<E>[] = [];
     for (let i = 0; i < nodes.length; i++) renderInlinePiece(nodes[i], eng, i, out);
     return out;
 }
@@ -290,152 +208,64 @@ function renderInlineNodes<E>(nodes: readonly Node[], eng: Engine<E>): MarkdownC
 /**
  * Render one inline node into `out` and key what it produced by its index:
  * `"<i>"` for the usual single child, `"<i>.<j>"` per piece when a node
- * expands to several (an unresolved reference, a plugin fallback).
+ * expands to several (an unresolved reference, a fallback to children).
  */
-function renderInlinePiece<E>(node: Node, eng: Engine<E>, index: number, out: MarkdownChild<E>[]): void {
+function renderInlinePiece<E>(node: Node, eng: Engine<E>, index: number, out: RenderChild<E>[]): void {
     const before = out.length;
-    renderInlineNode(node, eng, out);
+    renderNode(node, eng, null, index, out);
     const added = out.length - before;
     if (added === 1) eng.stamp(out[before], String(index));
     else for (let j = 0; j < added; j++) eng.stamp(out[before + j], `${index}.${j}`);
 }
 
-function renderInlineNode<E>(node: Node, eng: Engine<E>, out: MarkdownChild<E>[]): void {
-    const C = eng.C;
-    const n = node as PhrasingContent;
-    switch (n.type) {
-        case 'text':
-            out.push(C.text({ node: n, value: n.value }));
-            return;
-        case 'emphasis':
-            out.push(C.emphasis({ node: n, children: renderInlineNodes(n.children, eng) }));
-            return;
-        case 'strong':
-            out.push(C.strong({ node: n, children: renderInlineNodes(n.children, eng) }));
-            return;
-        case 'delete':
-            out.push(C.delete({ node: n, children: renderInlineNodes(n.children, eng) }));
-            return;
-        case 'inlineCode':
-            out.push(C.inlineCode({ node: n, value: n.value }));
-            return;
-        case 'break':
-            out.push(C.break({ node: n }));
-            return;
-        case 'link':
-            out.push(
-                C.link({
-                    node: n,
-                    url: eng.sanitize(n.url, 'link'),
-                    title: n.title ?? null,
-                    autolink: n.data?.autolink === true,
-                    children: renderInlineNodes(n.children, eng),
-                    onLink: eng.onLink,
-                }),
-            );
-            return;
-        case 'image':
-            out.push(C.image({ node: n, url: eng.sanitize(n.url, 'image'), alt: n.alt ?? '', title: n.title ?? null }));
-            return;
-        case 'linkReference':
-            renderLinkReference(n, eng, out);
-            return;
-        case 'imageReference':
-            renderImageReference(n, eng, out);
-            return;
-        default:
-            renderPluginNode(n, eng, null, out);
-    }
-}
-
-/** The bracket suffix that follows a reference's label in the source. */
-function referenceSuffix(node: LinkReference | ImageReference): string {
-    switch (node.referenceType) {
-        case 'full':
-            return `[${node.label ?? node.identifier}]`;
-        case 'collapsed':
-            return '[]';
-        default:
-            return '';
-    }
-}
-
-function textNode(value: string): Text {
-    return { type: 'text', value };
-}
-
 /**
- * A resolved reference renders through `components.link`; an unresolved one
- * renders as the literal source — `[`, the rendered children, `]…` — so the
- * visible text matches what was written (CommonMark).
+ * The one dispatch: `spec.render` (escape hatch) → the node's component with
+ * `{ node, children, ...spec.props }` → `spec.text` through the `text`
+ * component → the rendered children alone (dev-warned once per type).
+ * `key` is the block key, or `null` in inline position (the caller keys by
+ * index there).
  */
-function renderLinkReference<E>(node: LinkReference, eng: Engine<E>, out: MarkdownChild<E>[]): void {
-    const C = eng.C;
-    const def = eng.definitions.get(node.identifier);
-    const children = renderInlineNodes(node.children, eng);
-    if (def) {
-        out.push(
-            C.link({
-                node,
-                url: eng.sanitize(def.url, 'link'),
-                title: def.title ?? null,
-                autolink: false,
-                children,
-                onLink: eng.onLink,
-            }),
-        );
-        return;
+function renderNode<E>(node: Node, eng: Engine<E>, key: string | null, index: number, out: RenderChild<E>[]): void {
+    const spec = eng.schema.get(node.type) as NodeSpec | undefined;
+
+    if (spec?.render) {
+        const pieces = spec.render(node, renderApi(eng), key);
+        if (pieces) {
+            if (key !== null && pieces.length === 1) eng.stamp(pieces[0], key);
+            for (const piece of pieces) out.push(piece);
+            return;
+        }
     }
-    out.push(C.text({ node: textNode('['), value: '[' }));
-    for (const child of children) out.push(child);
-    const tail = `]${referenceSuffix(node)}`;
-    out.push(C.text({ node: textNode(tail), value: tail }));
-}
 
-function renderImageReference<E>(node: ImageReference, eng: Engine<E>, out: MarkdownChild<E>[]): void {
-    const C = eng.C;
-    const def = eng.definitions.get(node.identifier);
-    const alt = node.alt ?? '';
-    if (def) {
-        out.push(C.image({ node, url: eng.sanitize(def.url, 'image'), alt, title: def.title ?? null }));
-        return;
-    }
-    const value = `![${alt}]${referenceSuffix(node)}`;
-    out.push(C.text({ node: textNode(value), value }));
-}
-
-// ---------------------------------------------------------------------------
-// Plugin nodes
-// ---------------------------------------------------------------------------
-
-/**
- * A node of a type without a fixed slot. In order: `components[node.type]`
- * (called with `{ node, children }`; `null` renders nothing), then the
- * plugin's serialize rule rendered as text, then the rendered children alone
- * (dev-warned once per type). `key` is the block key, or `null` in inline
- * position (where the caller keys by index).
- */
-function renderPluginNode<E>(node: Node, eng: Engine<E>, key: string | null, out: MarkdownChild<E>[]): void {
-    const C = eng.C;
     const kids = (node as Partial<Parent>).children;
-    const renderChildren = (): MarkdownChild<E>[] => {
+    const renderChildren = (): RenderChild<E>[] => {
         if (!Array.isArray(kids)) return [];
-        return key === null ? renderInlineNodes(kids, eng) : renderBlocks(kids, eng, key);
+        // Text blocks and marks hold phrasing content; containers hold keyed
+        // blocks; an unknown type follows its position.
+        const inline = spec ? INLINE_CHILDREN_ROLES.has(spec.role) : key === null;
+        eng.stack.push({ node, index });
+        try {
+            return inline || key === null ? renderInlineNodes(kids, eng) : renderBlocks(kids, eng, key);
+        } finally {
+            eng.stack.pop();
+        }
     };
 
-    const component = C[node.type];
+    const component = eng.C[node.type];
     if (component) {
-        const el = component({ node, children: renderChildren() });
+        const props = spec?.props ? spec.props(node, propsContext(eng, index)) : undefined;
+        const el = component({ node, children: renderChildren(), ...props });
         if (el == null) return;
-        if (key !== null) eng.stamp(el, key);
+        if (key !== null) {
+            if (__DEV__ && typeof el === 'string' && spec && ELEMENT_ROLES.has(spec.role) && !spec.textOutput) warnStringBlock(node.type, eng);
+            eng.stamp(el, key);
+        }
         out.push(el);
         return;
     }
 
-    const rule = eng.plugins?.serialize.get(node.type);
-    if (rule) {
-        const value = rule(node, createSerializeContext(eng));
-        const el = C.text({ node: textNode(value), value });
+    if (spec?.text) {
+        const el = textChild(spec.text(node), eng);
         if (key !== null) eng.stamp(el, key);
         out.push(el);
         return;
@@ -443,39 +273,21 @@ function renderPluginNode<E>(node: Node, eng: Engine<E>, key: string | null, out
 
     if (__DEV__ && !warnedTypes.has(node.type)) {
         warnedTypes.add(node.type);
-        console.warn(
-            `[@sigx/markdown] No component or serialize rule for node type "${node.type}"; rendering its children only.`,
-        );
+        console.warn(`[@sigx/markdown] No component or text projection for node type "${node.type}"; rendering its children only.`);
     }
     for (const child of renderChildren()) out.push(child);
 }
 
-/**
- * A minimal `SerializeContext` for the serialize-rule fallback. The real
- * serializer is not pulled into every renderer just for this path: nested
- * nodes serialize through the plugin rules when one exists and otherwise
- * degrade to the plain text of their literals (no escaping, no indentation,
- * children joined without separators).
- */
-function createSerializeContext<E>(eng: Engine<E>): SerializeContext {
-    const ctx: SerializeContext = {
-        indent: '',
-        options: {},
-        escapeText: (text) => text,
-        serialize: (node) => {
-            const rule = eng.plugins?.serialize.get(node.type);
-            return rule ? rule(node, ctx) : plainText(node);
-        },
-        serializeChildren: (node) => node.children.map((child) => ctx.serialize(child)).join(''),
+function propsContext<E>(eng: Engine<E>, index: number): PropsContext {
+    const ancestors = eng.stack.slice();
+    return {
+        parent: ancestors[ancestors.length - 1]?.node,
+        index,
+        ancestors,
+        env: eng.env,
+        sanitizeUrl: eng.sanitize,
+        onLink: eng.onLink,
     };
-    return ctx;
-}
-
-function plainText(node: Node): string {
-    const value = (node as Partial<Literal>).value;
-    if (typeof value === 'string') return value;
-    const children = (node as Partial<Parent>).children;
-    return Array.isArray(children) ? children.map(plainText).join('') : '';
 }
 
 // ---------------------------------------------------------------------------

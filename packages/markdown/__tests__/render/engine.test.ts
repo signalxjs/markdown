@@ -9,18 +9,21 @@ import type {
     List,
     Node,
     Paragraph,
+    Parent,
     PhrasingContent,
     Root,
     Table,
     ThematicBreak,
 } from '../../src/ast/index.js';
-import { resolvePlugins } from '../../src/plugin/index.js';
+import { createSchema, markdownNodes, markdownSchema, standardNodes, type NodeSpec } from '../../src/schema/index.js';
 import {
+    collectEnv,
+    missingComponents,
     renderBlock,
     renderDocument,
     renderInline,
-    type MarkdownChild,
-    type MarkdownComponents,
+    type ComponentMap,
+    type RenderChild,
     type RenderContext,
 } from '../../src/render/index.js';
 
@@ -31,15 +34,15 @@ import {
 interface El {
     tag: string;
     props: Record<string, unknown>;
-    children: MarkdownChild<El>[];
+    children: RenderChild<El>[];
     key?: string;
 }
 
-function h(tag: string, props: Record<string, unknown> = {}, children: MarkdownChild<El>[] = []): El {
+function h(tag: string, props: Record<string, unknown> = {}, children: RenderChild<El>[] = []): El {
     return { tag, props, children };
 }
 
-const components: MarkdownComponents<El> = {
+const components: ComponentMap<El> = {
     root: ({ children }) => h('root', {}, children),
     paragraph: ({ children }) => h('p', {}, children),
     heading: ({ depth, children }) => h(`h${depth}`, {}, children),
@@ -63,15 +66,21 @@ const components: MarkdownComponents<El> = {
     image: ({ url, alt, title }) => h('img', { url, alt, title }),
 };
 
-const ctx: RenderContext<El> = { components };
+const ctx: RenderContext<El> = { components, schema: markdownSchema };
+/** A context with extra node specs on top of the markdown schema. */
+const withNodes = (nodes: NodeSpec[], extra: Partial<RenderContext<El>> = {}): RenderContext<El> => ({
+    components,
+    schema: createSchema([...standardNodes, ...markdownNodes, ...nodes]),
+    ...extra,
+});
 
 const text = (value: string): PhrasingContent => ({ type: 'text', value });
 const p = (children: PhrasingContent[], key?: string): Paragraph => ({ type: 'paragraph', children, ...(key ? { key } : {}) });
 const root = (...children: Root['children']): Root => ({ type: 'root', children });
 
 /** Render and return the root's children (the top-level elements). */
-const render = (r: Root, c: RenderContext<El> = ctx): MarkdownChild<El>[] => renderDocument(r, c).children;
-const el = (child: MarkdownChild<El> | undefined): El => child as El;
+const render = (r: Root, c: RenderContext<El> = ctx): RenderChild<El>[] => renderDocument(r, c).children;
+const el = (child: RenderChild<El> | undefined): El => child as El;
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -88,7 +97,7 @@ describe('renderDocument — dispatch', () => {
         expect(out.key).toBeUndefined();
     });
 
-    it('dispatches every built-in block type with its props', () => {
+    it('dispatches every standard block type with the props its spec declares', () => {
         const heading: Heading = { type: 'heading', depth: 2, children: [text('T')] };
         const quote: Blockquote = { type: 'blockquote', children: [p([text('q')])] };
         const code: Code = { type: 'code', lang: 'ts', meta: 'x=1', value: 'let a;' };
@@ -106,7 +115,7 @@ describe('renderDocument — dispatch', () => {
         expect(out[5]).toBe('<b>raw</b>');
     });
 
-    it('dispatches every built-in inline type', () => {
+    it('dispatches every standard inline type', () => {
         const para = p([
             text('a'),
             { type: 'emphasis', children: [text('e')] },
@@ -134,9 +143,9 @@ describe('renderDocument — dispatch', () => {
 
     it('passes the AST node to every component', () => {
         const para = p([text('x')]);
-        const paragraph = vi.fn(components.paragraph);
-        const textFn = vi.fn(components.text);
-        render(root(para), { components: { ...components, paragraph, text: textFn } });
+        const paragraph = vi.fn(components.paragraph!);
+        const textFn = vi.fn(components.text!);
+        render(root(para), { components: { ...components, paragraph, text: textFn }, schema: markdownSchema });
         expect(paragraph.mock.calls[0][0].node).toBe(para);
         expect(textFn.mock.calls[0][0].node).toBe(para.children[0]);
     });
@@ -154,13 +163,13 @@ describe('renderDocument — dispatch', () => {
     it('passes onLink to link components', () => {
         const onLink = vi.fn();
         const para = p([{ type: 'link', url: 'https://x.y', children: [text('l')] }]);
-        const out = el(render(root(para), { components, onLink })[0]).children;
+        const out = el(render(root(para), { ...ctx, onLink })[0]).children;
         expect(el(out[0]).props.onLink).toBe(onLink);
     });
 });
 
 describe('renderDocument — lists and tables', () => {
-    it('renders list and item props', () => {
+    it('renders list and item props (the item reads its list through the props context)', () => {
         const list: List = {
             type: 'list',
             ordered: true,
@@ -184,7 +193,7 @@ describe('renderDocument — lists and tables', () => {
         expect(el(ul.children[0]).props).toMatchObject({ ordered: false, number: 1, checked: null });
     });
 
-    it('renders a table with a header row and align padded to the widest row', () => {
+    it('renders a table with a header row and align padded to the widest row (cells read the table through their ancestors)', () => {
         const table: Table = {
             type: 'table',
             align: ['left'],
@@ -288,7 +297,7 @@ describe('renderDocument — keys', () => {
         const stampKey = vi.fn((e: El, key: string) => {
             e.props.k = key;
         });
-        const out = render(root(p([text('a'), { type: 'break' }], 'b-1')), { components, stampKey });
+        const out = render(root(p([text('a'), { type: 'break' }], 'b-1')), { ...ctx, stampKey });
         expect(el(out[0]).key).toBeUndefined();
         expect(el(out[0]).props.k).toBe('b-1');
         expect(el(el(out[0]).children[1]).props.k).toBe('1');
@@ -297,24 +306,24 @@ describe('renderDocument — keys', () => {
         expect(stampKey).toHaveBeenCalledTimes(2);
     });
 
-    it('warns in dev when a block component returns a string', () => {
+    it('warns in dev when a block component returns a string, but not for a textOutput spec (html)', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const bad: MarkdownComponents<El> = { ...components, paragraph: () => 'plain' as unknown as El };
-        const out = render(root(p([text('a')]), p([text('b')])), { components: bad });
-        expect(out).toEqual(['plain', 'plain']);
+        const bad: ComponentMap<El> = { ...components, paragraph: () => 'plain' as unknown as El };
+        const out = render(root(p([text('a')]), p([text('b')]), { type: 'html', value: '<i>' }), { components: bad, schema: markdownSchema });
+        expect(out).toEqual(['plain', 'plain', '<i>']);
         expect(warn).toHaveBeenCalledTimes(1); // once per slot
         expect(warn.mock.calls[0][0]).toMatch(/"paragraph" component returned a string/);
     });
 
     it('does not warn about string blocks when stampKey is supplied', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const bad: MarkdownComponents<El> = { ...components, heading: () => 'plain' as unknown as El };
-        render(root({ type: 'heading', depth: 1, children: [] }), { components: bad, stampKey: () => {} });
+        const bad: ComponentMap<El> = { ...components, heading: () => 'plain' as unknown as El };
+        render(root({ type: 'heading', depth: 1, children: [] }), { components: bad, schema: markdownSchema, stampKey: () => {} });
         expect(warn).not.toHaveBeenCalled();
     });
 });
 
-describe('renderDocument — references and definitions', () => {
+describe('renderDocument — references and definitions (the markdown specs)', () => {
     const def: Definition = { type: 'definition', identifier: 'ex', label: 'Ex', url: 'https://ex.com', title: 'Example' };
 
     it('resolves a linkReference through components.link using the definition', () => {
@@ -336,9 +345,16 @@ describe('renderDocument — references and definitions', () => {
         expect(el(out[0]).tag).toBe('a');
     });
 
-    it('uses ctx.definitions when given instead of collecting', () => {
+    it('collectEnv gathers the first definition per identifier, walking the root and its containers only', () => {
+        const dup: Definition = { type: 'definition', identifier: 'ex', url: 'https://second.com' };
+        const env = collectEnv(root(def, { type: 'blockquote', children: [dup] }), markdownSchema) as { definitions?: Map<string, Definition> };
+        expect(env.definitions?.get('ex')).toBe(def);
+        expect(collectEnv(root(p([])), markdownSchema)).toEqual({});
+    });
+
+    it('uses ctx.env when given instead of collecting', () => {
         const para = p([{ type: 'linkReference', identifier: 'ex', referenceType: 'shortcut', children: [text('see')] }]);
-        const out = el(render(root(para, def), { components, definitions: new Map() })[0]).children;
+        const out = el(render(root(para, def), { ...ctx, env: { definitions: new Map() } })[0]).children;
         expect(out).toEqual(['[', 'see', ']']);
     });
 
@@ -373,8 +389,17 @@ describe('renderDocument — references and definitions', () => {
 
     it('renders definitions through components.definition when present', () => {
         const definition = vi.fn(({ node }: { node: Definition }) => h('def', { id: node.identifier }));
-        const out = render(root(def), { components: { ...components, definition } });
+        const out = render(root(def), { components: { ...components, definition }, schema: markdownSchema });
         expect(el(out[0])).toMatchObject({ tag: 'def', props: { id: 'ex' }, key: 'b-0' });
+    });
+
+    it('renders references as their literal source in a schema without the markdown specs', () => {
+        const para = p([{ type: 'linkReference', identifier: 'ex', referenceType: 'shortcut', children: [text('see')] }]);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const out = el(render(root(para, def), { components, schema: createSchema(standardNodes) })[0]).children;
+        // unknown types: the reference falls back to its children, the definition to nothing
+        expect(out).toEqual(['see']);
+        expect(warn).toHaveBeenCalled();
     });
 });
 
@@ -402,31 +427,41 @@ describe('renderDocument — sanitisation', () => {
         expect(out[1].props.url).toBe('#');
 
         const sanitizeUrl = vi.fn((url: string, kind: string) => `${kind}:${url}`);
-        const custom = el(render(root(para, bad), { components, sanitizeUrl })[0]).children.map(el);
+        const custom = el(render(root(para, bad), { ...ctx, sanitizeUrl })[0]).children.map(el);
         expect(custom[0].props.url).toBe('link:javascript:x');
         expect(custom[1].props.url).toBe('image:javascript:x');
     });
 });
 
 describe('renderDocument — plugin nodes', () => {
-    const mention = (name: string): PhrasingContent => ({ type: "mention", name } as unknown as PhrasingContent);
+    const mention = (name: string): PhrasingContent => ({ type: 'mention', name }) as unknown as PhrasingContent;
 
     it('dispatches to components[node.type] with the node and rendered children', () => {
-        const mentionFn = vi.fn(({ node }: { node: Node; children: MarkdownChild<El>[] }) =>
+        const mentionFn = vi.fn(({ node }: { node: Node; children: RenderChild<El>[] }) =>
             h('mention', { name: (node as unknown as { name: string }).name }),
         );
         const para = p([text('hi '), mention('bob')]);
-        const out = el(render(root(para), { components: { ...components, mention: mentionFn } })[0]).children;
+        const out = el(render(root(para), { components: { ...components, mention: mentionFn }, schema: markdownSchema })[0]).children;
         expect(out[0]).toBe('hi ');
         expect(el(out[1])).toMatchObject({ tag: 'mention', props: { name: 'bob' }, key: '1' });
         expect(mentionFn.mock.calls[0][0]).toEqual({ node: para.children[1], children: [] });
     });
 
+    it('passes a plugin spec\'s props to its component', () => {
+        const badge = vi.fn(({ level, children }: { level: string; children: RenderChild<El>[] }) => h('badge', { level }, children));
+        const node = { type: 'badge', level: 'hot', children: [text('x')] } as unknown as PhrasingContent;
+        const c = withNodes([{ type: 'badge', role: 'mark', props: (n) => ({ level: (n as unknown as { level: string }).level }) }], {
+            components: { ...components, badge },
+        });
+        const out = el(render(root(p([node])), c)[0]).children;
+        expect(el(out[0])).toMatchObject({ tag: 'badge', props: { level: 'hot' }, children: ['x'] });
+    });
+
     it('renders a plugin block with its children rendered and its key stamped', () => {
         const callout = { type: 'callout', key: 'c1', kind: 'warn', children: [p([text('inner')])] } as unknown as BlockContent;
-        const calloutFn = ({ node, children }: { node: Node; children: MarkdownChild<El>[] }) =>
+        const calloutFn = ({ node, children }: { node: Node; children: RenderChild<El>[] }) =>
             h('callout', { kind: (node as unknown as { kind: string }).kind }, children);
-        const out = render(root(callout), { components: { ...components, callout: calloutFn } });
+        const out = render(root(callout), { components: { ...components, callout: calloutFn }, schema: markdownSchema });
         const c = el(out[0]);
         expect(c).toMatchObject({ tag: 'callout', props: { kind: 'warn' }, key: 'c1' });
         expect(el(c.children[0])).toMatchObject({ tag: 'p', children: ['inner'], key: 'c1.0' });
@@ -434,8 +469,8 @@ describe('renderDocument — plugin nodes', () => {
 
     it('renders a keyless plugin block with a path key and inline children by index', () => {
         const note = { type: 'note', children: [text('a'), { type: 'strong', children: [] }] } as unknown as BlockContent;
-        const noteFn = ({ children }: { children: MarkdownChild<El>[] }) => h('note', {}, children);
-        const out = render(root(p([]), note), { components: { ...components, note: noteFn } });
+        const noteFn = ({ children }: { children: RenderChild<El>[] }) => h('note', {}, children);
+        const out = render(root(p([]), note), { components: { ...components, note: noteFn }, schema: markdownSchema });
         const n = el(out[1]);
         expect(n.key).toBe('b-1');
         expect(n.children[0]).toBe('a');
@@ -444,41 +479,30 @@ describe('renderDocument — plugin nodes', () => {
 
     it('renders nothing when a plugin component returns null', () => {
         const para = p([text('a'), mention('x'), text('b')]);
-        const out = el(render(root(para), { components: { ...components, mention: () => null } })[0]).children;
+        const out = el(render(root(para), { components: { ...components, mention: () => null }, schema: markdownSchema })[0]).children;
         expect(out).toEqual(['a', 'b']);
     });
 
-    it('falls back to the plugin serialize rule rendered as text', () => {
-        const plugins = resolvePlugins([
-            {
-                name: 'mentions',
-                serialize: { mention: (node: { name: string }) => `@${node.name}` },
-            },
-        ]);
+    it('falls back to the spec\'s text projection, through the text component', () => {
+        const c = withNodes([{ type: 'mention', role: 'atom', text: (n) => `@${(n as unknown as { name: string }).name}` }]);
         const para = p([text('hi '), mention('bob')]);
-        const out = el(render(root(para), { components, plugins })[0]).children;
-        expect(out).toEqual(['hi ', '@bob']);
+        expect(el(render(root(para), c)[0]).children).toEqual(['hi ', '@bob']);
+        const wrapped = el(render(root(para), { ...c, components: { ...components, text: ({ value }) => h('t', {}, [value]) } })[0]).children;
+        expect(el(wrapped[1])).toMatchObject({ tag: 't', children: ['@bob'], key: '1' });
     });
 
-    it('gives the serialize rule a minimal context (children as plain text, nested rules)', () => {
-        const plugins = resolvePlugins([
-            {
-                name: 'spoilers',
-                serialize: {
-                    spoiler: (node, ctx) => `||${ctx.serializeChildren(node)}||`,
-                    mention: (node: { name: string }, ctx) => ctx.escapeText(`@${node.name}`),
-                },
-            },
+    it('lets a spec render by hand (the escape hatch), keyed as one piece or several', () => {
+        const c = withNodes([
+            { type: 'twice', role: 'mark', render: (n, api) => [...api.renderInline((n as Parent).children), api.text('!')] },
+            { type: 'skip', role: 'void', render: () => [] },
         ]);
-        const spoiler = {
-            type: 'spoiler',
-            children: [text('a '), { type: 'emphasis', children: [text('b')] }, mention('c')],
-        } as unknown as PhrasingContent;
-        const out = el(render(root(p([spoiler as PhrasingContent])), { components, plugins })[0]).children;
-        expect(out).toEqual(['||a b@c||']);
+        const twice = { type: 'twice', children: [text('a'), { type: 'emphasis', children: [] }] } as unknown as PhrasingContent;
+        const out = render(root(p([twice]), { type: 'skip' } as unknown as BlockContent), c);
+        expect(el(out[0]).children).toEqual(['a', { tag: 'em', props: {}, children: [], key: '0.1' }, '!']);
+        expect(out).toHaveLength(1);
     });
 
-    it('falls back to the rendered children (dev warning once per type) with no component or rule', () => {
+    it('falls back to the rendered children (dev warning once per type) with no component or text projection', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const wrap = (id: string): PhrasingContent =>
             ({ type: 'unknownWrap', children: [text(`[${id}]`), { type: 'emphasis', children: [] }] }) as unknown as PhrasingContent;
@@ -497,6 +521,13 @@ describe('renderDocument — plugin nodes', () => {
         const wrap = { type: 'unknownBlock', key: 'w', children: [p([text('a')]), p([text('b')])] } as unknown as BlockContent;
         const out = render(root(wrap));
         expect(out.map(el).map((e) => e.key)).toEqual(['w.0', 'w.1']);
+    });
+
+    it('missingComponents lists the schema types a map leaves unrendered', () => {
+        expect(missingComponents(markdownSchema, components)).toEqual([]);
+        const { link, ...rest } = components;
+        void link;
+        expect(missingComponents(withNodes([{ type: 'callout', role: 'container' }]).schema, rest as ComponentMap<El>)).toEqual(['link', 'callout']);
     });
 });
 
@@ -518,7 +549,7 @@ describe('renderBlock / renderInline', () => {
         expect(el(el(out?.children[0]).children[0]).props.url).toBe('https://ex.com');
     });
 
-    it('renderInline renders phrasing content with index keys and optional definitions', () => {
+    it('renderInline renders phrasing content with index keys and an optional env', () => {
         const nodes: PhrasingContent[] = [
             text('a'),
             { type: 'strong', children: [] },
@@ -530,7 +561,7 @@ describe('renderBlock / renderInline', () => {
         expect(out.slice(2)).toEqual(['[', 'r', ']']);
 
         const definitions = new Map<string, Definition>([['ex', { type: 'definition', identifier: 'ex', url: 'https://ex.com' }]]);
-        const resolved = renderInline(nodes, { components, definitions });
+        const resolved = renderInline(nodes, { ...ctx, env: { definitions } });
         expect(el(resolved[2])).toMatchObject({ tag: 'a', props: { url: 'https://ex.com' }, key: '2' });
     });
 });

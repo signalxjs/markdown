@@ -66,7 +66,7 @@ const VoidBlock = component<{ block: EditorBlock }>(({ props }) => {
     };
     return () => {
         const node = props.block as BlockContent;
-        const ctx: RenderContext<JSXElement> = { components: view.components() };
+        const ctx: RenderContext<JSXElement> = { components: view.components(), schema: editor.schema };
         const rendered = renderBlock(node, ctx, key);
         const label = node.type === 'thematicBreak' ? 'Divider' : node.type === 'definition' ? 'Link definition' : node.type;
         return (

@@ -9,6 +9,7 @@ export type {
     InlineSyntaxExtension,
     LineInfo,
     MarkdownPlatformComponents,
+    PlatformComponentMap,
     MarkdownPlugin,
     SerializeContext,
     SerializeRule,

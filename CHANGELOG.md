@@ -8,6 +8,33 @@ workspace shares one version line.
 
 ### Changed
 
+- **Schema-driven render engine** (#22, phase 2 of #19). `render/engine.ts`
+  has no per-type code any more: one `renderNode` reads the `NodeSpec` —
+  `props` (what the component receives beyond `node` and `children`: a
+  heading's `depth`, a list item's `number`, a cell's `align`, a link's
+  sanitised `url`), `render` (the escape hatch references use), `text` (the
+  projection a node renders as without a component), `collect` (the render
+  env — CommonMark definitions are gathered by the `definition` spec).
+  `RenderContext` takes `schema` (required) and `env` (replaces
+  `definitions`); `collectEnv()` and `missingComponents()` are exported. The
+  serialize-rule render fallback is gone: a node without a component renders
+  its spec's `text`, else its children.
+- Component contract renamed: `ComponentMap<E>` (only `root` required),
+  `StandardComponents<E>`, `PluginComponents<E>`, `RenderChild<E>` replace
+  `MarkdownComponents` / `MarkdownComponentMap` / `MarkdownPluginComponents` /
+  `MarkdownChild`; the DOM map is `DomComponents`. `RenderContext.plugins` is
+  gone.
+- `<MarkdownView>` is `<RichTextView>` (`schema` prop; merges the DOM
+  renderers plugins ship through `components.dom`).
+  `MarkdownPlatformComponents` declares `dom` / `lynx` / `terminal` slots.
+- The highlighter contract (`CodeHighlighter`, `HighlightedToken`,
+  `plainTokens`) and the highlighted code block (`highlightedCodeBlock`, was
+  `shikiCodeBlock`) live in `@sigx/markdown/dom`; `@sigx/markdown/shiki` keeps
+  `createShikiHighlighter` and adds `shikiPlugin()` — the only module that
+  imports `shiki`.
+- `mentionNode` (the mention `NodeSpec`, with a `@label` text projection) is
+  part of `mentionPlugin` in the root entry.
+
 - **Schema as data** (#20, phase 1 of #19). One `Schema` now says what every
   node type is — `NodeSpec { type, role, … }` with roles `textblock`,
   `container`, `table`, `code`, `void`, `inline`, `mark`, `atom` — and every

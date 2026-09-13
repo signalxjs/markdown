@@ -11,11 +11,12 @@
 import type { JSXElement } from '@sigx/runtime-core';
 import type {} from '@sigx/runtime-dom';
 import type { Link, LinkReference } from '../ast/index.js';
-import type { LinkHandler, MarkdownComponents } from '../render/index.js';
+import type { ComponentMap, LinkHandler, StandardComponents } from '../render/index.js';
 import { CodeBlock } from './code-block.js';
 import { partAttrs } from './parts.js';
 
-export type DomMarkdownComponents = MarkdownComponents<JSXElement>;
+/** The DOM component map: every standard slot present, plugin slots by node type. */
+export type DomComponents = StandardComponents<JSXElement> & ComponentMap<JSXElement>;
 
 /** The `onLink` handler of the DOM view: the click event comes along. */
 export type DomLinkHandler = (url: string, node: Link | LinkReference, event: MouseEvent) => void;
@@ -32,7 +33,7 @@ export interface DomComponentsOptions {
 const EXTERNAL = /^https?:\/\//i;
 
 /** Build the default component map (call with options, or use `defaultComponents`). */
-export function createDomComponents(options: DomComponentsOptions = {}): DomMarkdownComponents {
+export function createDomComponents(options: DomComponentsOptions = {}): DomComponents {
     const prefix = options.classPrefix;
     const part = (name: string) => partAttrs(name, prefix);
 
@@ -133,4 +134,4 @@ export function createDomComponents(options: DomComponentsOptions = {}): DomMark
 }
 
 /** The defaults with no class prefix. */
-export const defaultComponents: DomMarkdownComponents = createDomComponents();
+export const defaultComponents: DomComponents = createDomComponents();

@@ -11,7 +11,7 @@
   {
     "name": "@sigx/markdown/dom",
     "path": "packages/markdown/dist/dom.prod.js",
-    "limit": "16 KB",
+    "limit": "18 KB",
     "ignore": [
       "@sigx/markdown",
       "@sigx/reactivity",
@@ -55,7 +55,7 @@
   {
     "name": "@sigx/markdown/testing",
     "path": "packages/markdown/dist/testing.prod.js",
-    "limit": "6 KB",
+    "limit": "8 KB",
     "ignore": [
       "@sigx/markdown",
       "@sigx/reactivity",
