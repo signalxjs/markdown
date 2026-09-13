@@ -56,6 +56,25 @@ describe('assignKeys', () => {
         expect(list.children[0].children[0].children[0].key).toBeUndefined();
     });
 
+    it('never keys phrasing content, even types the schema does not know (a reference under the standard schema)', () => {
+        const root: Root = {
+            type: 'root',
+            children: [
+                { type: 'paragraph', children: [{ type: 'linkReference', identifier: 'x', referenceType: 'shortcut', children: [{ type: 'text', value: 'x' }] }] },
+                { type: 'callout', children: [{ type: 'paragraph', children: [] }] } as unknown as Root['children'][number],
+            ],
+        };
+        assignKeys(root, standardSchema);
+        const para = root.children[0] as { key?: string; children: { key?: string; children: { key?: string }[] }[] };
+        expect(para.key).toBe('b-0');
+        expect(para.children[0].key).toBeUndefined();
+        expect(para.children[0].children[0].key).toBeUndefined();
+        // an unknown block type still keys its children (a plugin container)
+        const callout = root.children[1] as { key?: string; children: { key?: string }[] };
+        expect(callout.key).toBe('b-1');
+        expect(callout.children[0].key).toBe('b-1.0');
+    });
+
     it('re-keys a parsed tree exactly as the parser did', () => {
         const keysOf = (root: Root): string[] => {
             const out: string[] = [];
