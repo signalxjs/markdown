@@ -27,7 +27,7 @@ declare module '@sigx/markdown' {
     interface PhrasingContentMap {
         mention: Mention;
     }
-    interface MarkdownPluginComponents<E> {
+    interface PluginComponents<E> {
         mention(p: NodeProps<E, Mention>): RenderChild<E>;
     }
 }
