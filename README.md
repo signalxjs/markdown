@@ -45,6 +45,7 @@ Peers on `@sigx/reactivity` and `@sigx/runtime-core` (and `@sigx/runtime-dom` fo
 ```tsx
 import { component } from 'sigx';
 import { createTextStream } from '@sigx/markdown';
+import { markdownFormat } from '@sigx/markdown';
 import { RichTextView } from '@sigx/markdown/dom';
 
 const stream = createTextStream({ flushIntervalMs: 16 });
