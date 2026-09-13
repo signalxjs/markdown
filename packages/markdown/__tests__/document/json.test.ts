@@ -21,14 +21,6 @@ describe('toJSON / fromJSON', () => {
         expect(() => fromJSON({ type: 'root', children: [], data: { format: 3 } })).toThrow(/data.format/);
     });
 
-    it('records the source format id and rejects a non-string one', () => {
-        const json = toJSON(parseMarkdown('a'), { format: 'markdown' });
-        expect(json.data.format).toBe('markdown');
-        expect(fromJSON(json).data?.format).toBe('markdown');
-        expect(toJSON(parseMarkdown('a')).data.format).toBeUndefined();
-        expect(() => fromJSON({ type: 'root', children: [], data: { format: 3 } })).toThrow(/data.format/);
-    });
-
     it('can keep positions', () => {
         const json = toJSON(parseMarkdown('a'), { position: true });
         expect(json.children[0].position).toBeDefined();
