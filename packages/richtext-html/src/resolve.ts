@@ -1,7 +1,9 @@
 /**
  * Resolve a plugin list's HTML slots into the lookup tables the parser and
  * serializer consume, plus the schema the vocabulary implies (the standard
- * specs and every plugin's `nodes`). Done once per parse / serialize call.
+ * specs and every plugin's `nodes`). Done once per parse / serialize call;
+ * the result is immutable so a caller mutating its plugin array afterwards
+ * cannot change parse behaviour.
  */
 
 import { createSchema, standardNodes, type NodeSpec, type RichTextPlugin, type Schema } from '@sigx/richtext';
@@ -17,13 +19,16 @@ export interface ResolvedHtmlPlugins {
     readonly schema: Schema;
 }
 
-let empty: ResolvedHtmlPlugins | undefined;
+const EMPTY: ResolvedHtmlPlugins = Object.freeze({
+    plugins: Object.freeze([]) as readonly RichTextPlugin[],
+    elements: new Map(),
+    serialize: new Map(),
+    schema: createSchema(standardNodes),
+});
 
-/** Resolve the HTML slots of a plugin list. `undefined`/empty yields a shared empty result. */
+/** Resolve (and validate) the HTML slots of a plugin list. `undefined`/empty yields a shared frozen empty result. */
 export function resolveHtmlPlugins(plugins?: readonly RichTextPlugin[] | null): ResolvedHtmlPlugins {
-    if (!plugins || plugins.length === 0) {
-        return (empty ??= { plugins: [], elements: new Map(), serialize: new Map(), schema: createSchema(standardNodes) });
-    }
+    if (!plugins || plugins.length === 0) return EMPTY;
     const kept: RichTextPlugin[] = [];
     const names = new Set<string>();
     const elements = new Map<string, HtmlElementRule[]>();
@@ -31,6 +36,10 @@ export function resolveHtmlPlugins(plugins?: readonly RichTextPlugin[] | null): 
     const serialize = new Map<string, HtmlSerializeRule<any>>();
     const nodes: NodeSpec[] = [];
     for (const plugin of plugins) {
+        if (!plugin || typeof plugin.name !== 'string' || plugin.name === '') {
+            if (__DEV__) console.warn('[@sigx/richtext-html] Ignoring a plugin without a name.');
+            continue;
+        }
         if (names.has(plugin.name)) {
             if (__DEV__) console.warn(`[@sigx/richtext-html] Duplicate plugin "${plugin.name}" ignored.`);
             continue;
@@ -47,5 +56,5 @@ export function resolveHtmlPlugins(plugins?: readonly RichTextPlugin[] | null): 
         }
         for (const [type, rule] of Object.entries(slice.serialize ?? {})) serialize.set(type, rule);
     }
-    return { plugins: kept, elements, serialize, schema: createSchema([...standardNodes, ...nodes]) };
+    return Object.freeze({ plugins: Object.freeze(kept), elements, serialize, schema: createSchema([...standardNodes, ...nodes]) });
 }
