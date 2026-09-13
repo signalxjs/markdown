@@ -26,8 +26,9 @@ import type {} from '@sigx/runtime-dom';
 import { defineProvide } from '@sigx/runtime-core';
 import type { Root } from '../../ast/index.js';
 import { createDomComponents, RichTextView, type DomComponents } from '../../dom/index.js';
+import { markdownFormat } from '../../markdown/index.js';
 import { parseMarkdown } from '../../parser/index.js';
-import type { MarkdownPlugin } from '../../plugin/index.js';
+import type { RichTextPlugin } from '../../plugin/index.js';
 import { toMarkdown } from '../../serializer/index.js';
 import { deleteBlock, escapeToText, focusEnd, focusNeighbour, selectedBlockKeys, type Command } from '../commands.js';
 import { createEditor, type Editor } from '../editor.js';
@@ -81,7 +82,7 @@ export type MarkdownEditorProps = Define.WithAttrs<
     & Define.Prop<'defaultMarkdown', string>
     & Define.Prop<'defaultDocument', Root>
     /** Plugins (syntax, serializer, components and editor slices). Captured at mount. */
-    & Define.Prop<'plugins', readonly MarkdownPlugin[]>
+    & Define.Prop<'plugins', readonly RichTextPlugin[]>
     /** Components for void blocks and the SSR/read-only rendering (overrides of the default DOM map). */
     & Define.Prop<'components', Partial<DomComponents>>
     /** Extra atom renderers by node type (images, mentions, plugin atoms). */
@@ -440,7 +441,7 @@ export const MarkdownEditor = component<MarkdownEditorProps, MarkdownEditorContr
             track(editor.rev.value);
             return (
                 <div {...rootAttrs} data-readonly="" data-ssr="">
-                    <RichTextView root={editor.state.doc} plugins={plugins} components={props.components} />
+                    <RichTextView root={editor.state.doc} format={markdownFormat} plugins={plugins} components={props.components} />
                 </div>
             );
         }

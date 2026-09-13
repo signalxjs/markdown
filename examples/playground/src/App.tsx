@@ -1,18 +1,19 @@
 /**
  * The playground: a source pane, the DOM view with its toggles, a streamed
- * copy of the view fed through `createMarkdownStream`, and the serializer
+ * copy of the view fed through `createTextStream`, and the serializer
  * output. One component, one reactive state object — the view re-renders
  * only the block a keystroke touches.
  */
 import { component, computed, type JSXElement } from 'sigx';
 import {
-    createMarkdownStream,
+    createTextStream,
+    markdownFormat,
     mentionPlugin,
     parseMarkdown,
     toJSON,
     toMarkdown,
     type RenderChild,
-    type MarkdownPlugin,
+    type RichTextPlugin,
     type Mention,
     type NodeProps
 } from '@sigx/markdown';
@@ -27,7 +28,7 @@ declare module '@sigx/markdown' {
     interface PhrasingContentMap {
         mention: Mention;
     }
-    interface MarkdownPluginComponents<E> {
+    interface PluginComponents<E> {
         mention(p: NodeProps<E, Mention>): RenderChild<E>;
     }
 }
@@ -84,8 +85,8 @@ That's it. Edit the source on the left; hit **Stream** to replay it token by tok
 
 // Plugin arrays are captured by the view's incremental engine: keep both
 // identities stable (a new array re-creates the engine and re-parses).
-const NO_PLUGINS: readonly MarkdownPlugin[] = [];
-const WITH_MENTION: readonly MarkdownPlugin[] = [mentionPlugin];
+const NO_PLUGINS: readonly RichTextPlugin[] = [];
+const WITH_MENTION: readonly RichTextPlugin[] = [mentionPlugin];
 
 /** Who `@` can mention in the editor. */
 const PEOPLE = [
@@ -96,7 +97,7 @@ const PEOPLE = [
 ];
 
 /** The editor's plugins: the mention syntax + `@` trigger + chip, and `/` block commands. Captured at mount. */
-const EDITOR_PLUGINS: readonly MarkdownPlugin[] = [
+const EDITOR_PLUGINS: readonly RichTextPlugin[] = [
     createDomMentionPlugin({
         onQuery: (q) => PEOPLE.filter((p) => p.label.toLowerCase().startsWith(q.toLowerCase()))
     }),
@@ -150,7 +151,7 @@ export const App = component(({ signal, onUnmounted }) => {
     };
 
     // ---- View inputs ----
-    const plugins = computed<readonly MarkdownPlugin[]>(() => (state.mention ? WITH_MENTION : NO_PLUGINS));
+    const plugins = computed<readonly RichTextPlugin[]>(() => (state.mention ? WITH_MENTION : NO_PLUGINS));
 
     const components = computed<Partial<DomComponents>>(() => {
         const slots: Partial<DomComponents> = { mention: MentionChip };
@@ -162,8 +163,8 @@ export const App = component(({ signal, onUnmounted }) => {
         state.lastLink = url;
     };
 
-    // ---- Streaming: replay the source through createMarkdownStream ----
-    const stream = createMarkdownStream({ flushIntervalMs: 16 });
+    // ---- Streaming: replay the source through createTextStream ----
+    const stream = createTextStream({ flushIntervalMs: 16 });
     let timer: ReturnType<typeof setInterval> | null = null;
 
     const clearTimer = (): void => {
@@ -322,7 +323,7 @@ export const App = component(({ signal, onUnmounted }) => {
                 <section class="pane">
                     <h2>View</h2>
                     <div class="body">
-                        <RichTextView
+                        <RichTextView format={markdownFormat}
                             id="static"
                             value={state.source}
                             plugins={plugins.value}
@@ -336,7 +337,7 @@ export const App = component(({ signal, onUnmounted }) => {
                 <section class="pane">
                     <h2>Streamed</h2>
                     <div class="body">
-                        <RichTextView
+                        <RichTextView format={markdownFormat}
                             id="streamed"
                             value={stream.value.value}
                             plugins={plugins.value}

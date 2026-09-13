@@ -18,10 +18,10 @@ Notes so far:
 The component looks like this:
 
 ```tsx
-import { createMarkdownStream } from '@sigx/markdown';
+import { createTextStream } from '@sigx/markdown';
 
 export function Answer(props: { text: () => string }) {
-    const stream = createMarkdownStream(props.text);
+    const stream = createTextStream(props.text);
 
     return (
         <article>

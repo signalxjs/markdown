@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseInline } from '../../src/parser/index.js';
 import { toMarkdown } from '../../src/serializer/index.js';
-import { resolvePlugins } from '../../src/plugin/index.js';
+import { resolveMarkdownPlugins } from '../../src/plugin/index.js';
 import { mentionPlugin } from '../../src/plugins/index.js';
 import {
     ATOM_CHAR,
@@ -77,7 +77,7 @@ describe('toFlat / toInline', () => {
             { type: 'mention', role: 'atom', inline: { fromFlat: (s) => ({ type: 'mention', id: s.attrs!.id, label: s.attrs!.label }) as never } },
             { type: 'highlight', role: 'mark' },
         ]);
-        const plugins = resolvePlugins([mentionPlugin]);
+        const plugins = resolveMarkdownPlugins([mentionPlugin]);
         const nodes = parseInline('hi @[Andy](u1)!', { plugins });
         const flat = toFlat(nodes, schema);
         expect(flat.text).toBe(`hi ${ATOM_CHAR}!`);

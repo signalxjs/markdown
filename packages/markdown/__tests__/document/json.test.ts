@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_VERSION, MarkdownFormatError, fromJSON, toJSON } from '../../src/document/index.js';
+import { CURRENT_VERSION, DocumentFormatError, fromJSON, toJSON } from '../../src/document/index.js';
 import { parseMarkdown } from '../../src/parser/index.js';
 
 describe('toJSON / fromJSON', () => {
@@ -11,6 +11,22 @@ describe('toJSON / fromJSON', () => {
         expect(JSON.stringify(json)).not.toContain('"position"');
         expect(JSON.stringify(json)).not.toContain('"open"');
         expect(root.children[0].key).toBe('b-0'); // input untouched
+    });
+
+    it('records the source format id and rejects a non-string one', () => {
+        const json = toJSON(parseMarkdown('a'), { format: 'markdown' });
+        expect(json.data.format).toBe('markdown');
+        expect(fromJSON(json).data?.format).toBe('markdown');
+        expect(toJSON(parseMarkdown('a')).data.format).toBeUndefined();
+        expect(() => fromJSON({ type: 'root', children: [], data: { format: 3 } })).toThrow(/data.format/);
+    });
+
+    it('records the source format id and rejects a non-string one', () => {
+        const json = toJSON(parseMarkdown('a'), { format: 'markdown' });
+        expect(json.data.format).toBe('markdown');
+        expect(fromJSON(json).data?.format).toBe('markdown');
+        expect(toJSON(parseMarkdown('a')).data.format).toBeUndefined();
+        expect(() => fromJSON({ type: 'root', children: [], data: { format: 3 } })).toThrow(/data.format/);
     });
 
     it('can keep positions', () => {
@@ -26,13 +42,13 @@ describe('toJSON / fromJSON', () => {
     });
 
     it('rejects a wrong shape and a newer version', () => {
-        expect(() => fromJSON({ type: 'paragraph' })).toThrow(MarkdownFormatError);
+        expect(() => fromJSON({ type: 'paragraph' })).toThrow(DocumentFormatError);
         expect(() => fromJSON({ type: 'root', children: [{}] })).toThrow(/no string type/);
         try {
             fromJSON({ type: 'root', children: [], data: { version: CURRENT_VERSION + 1 } });
             throw new Error('did not throw');
         } catch (err) {
-            expect((err as MarkdownFormatError).code).toBe('unsupported-version');
+            expect((err as DocumentFormatError).code).toBe('unsupported-version');
         }
     });
 });

@@ -8,6 +8,53 @@ workspace shares one version line.
 
 ### Changed
 
+- **Formats and format-agnostic plugins** (#24, phase 3 of #19). A
+  `DocumentFormat { id, mime, nodes?, parse, serialize, createIncrementalEngine? }`
+  is the codec between source text and the one tree; `markdownFormat`
+  (`@sigx/markdown` root entry) and `plainTextFormat` (`document/`) implement
+  it. The incremental engine is generic: `createLineEngine(LineBlockParser)`
+  is the streaming-stable engine over any line-oriented block parser
+  (markdown's `createIncrementalEngine` is a thin wrapper), and
+  `createReparseEngine(parse)` is the fallback for a format without one.
+  `<RichTextView>` takes a required `format` — the DOM entry knows no format
+  and no longer bundles the markdown parser or serializer.
+- `RichTextPlugin { name, nodes, components, editor, formats }` replaces
+  `MarkdownPlugin`: syntax lives under `formats.markdown` (a
+  `MarkdownPluginSlice` — `block`, `inline`, `serialize`, `entities`,
+  `transformBlock`, `transformDocument`), one slot per format id
+  (`PluginFormats` is interface-merged by each format). `resolvePlugins` /
+  `ResolvedPlugins` / `NO_PLUGINS` are `resolveMarkdownPlugins` /
+  `ResolvedMarkdownPlugins` / `NO_MARKDOWN_PLUGINS`; `MarkdownPlatformComponents`
+  is `PlatformComponents`. `mentionPlugin` is `{ nodes, formats: { markdown:
+  mentionMarkdown } }`.
+- `createMarkdownStream` / `MarkdownStream` are `createTextStream` /
+  `TextStream` (the stream never touched markdown). `toJSON({ format })`
+  records the source format in `data.format`; `MarkdownDocument` /
+  `MarkdownFormatError` are `RichTextDocument` / `DocumentFormatError`.
+
+- **Formats and format-agnostic plugins** (#24, phase 3 of #19). A
+  `DocumentFormat { id, mime, nodes?, parse, serialize, createIncrementalEngine? }`
+  is the codec between source text and the one tree; `markdownFormat`
+  (`@sigx/markdown` root entry) and `plainTextFormat` (`document/`) implement
+  it. The incremental engine is generic: `createLineEngine(LineBlockParser)`
+  is the streaming-stable engine over any line-oriented block parser
+  (markdown's `createIncrementalEngine` is a thin wrapper), and
+  `createReparseEngine(parse)` is the fallback for a format without one.
+  `<RichTextView>` takes a `format` (default markdown).
+- `RichTextPlugin { name, nodes, components, editor, formats }` replaces
+  `MarkdownPlugin`: syntax lives under `formats.markdown` (a
+  `MarkdownPluginSlice` — `block`, `inline`, `serialize`, `entities`,
+  `transformBlock`, `transformDocument`), one slot per format id
+  (`PluginFormats` is interface-merged by each format). `resolvePlugins` /
+  `ResolvedPlugins` / `NO_PLUGINS` are `resolveMarkdownPlugins` /
+  `ResolvedMarkdownPlugins` / `NO_MARKDOWN_PLUGINS`; `MarkdownPlatformComponents`
+  is `PlatformComponents`. `mentionPlugin` is `{ nodes, formats: { markdown:
+  mentionMarkdown } }`.
+- `createMarkdownStream` / `MarkdownStream` are `createTextStream` /
+  `TextStream` (the stream never touched markdown). `toJSON({ format })`
+  records the source format in `data.format`; `MarkdownDocument` /
+  `MarkdownFormatError` are `RichTextDocument` / `DocumentFormatError`.
+
 - **Schema-driven render engine** (#22, phase 2 of #19). `render/engine.ts`
   has no per-type code any more: one `renderNode` reads the `NodeSpec` —
   `props` (what the component receives beyond `node` and `children`: a

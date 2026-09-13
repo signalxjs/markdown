@@ -19,7 +19,7 @@
 
 import { signal, type PrimitiveSignal } from '@sigx/reactivity';
 import type { BlockContent, Root } from '../ast/index.js';
-import type { MarkdownPlugin } from '../plugin/index.js';
+import type { RichTextPlugin } from '../plugin/index.js';
 import type { Command, CommandContext, Dispatch } from './commands.js';
 import { commands as builtinCommands, pasteText, setDocument as setDocumentCommand } from './commands.js';
 import { createHistory, type History, type HistoryOptions } from './history.js';
@@ -37,7 +37,7 @@ import type { PlatformInfo } from './surface.js';
 
 export interface EditorOptions {
     doc?: Root;
-    plugins?: readonly MarkdownPlugin[];
+    plugins?: readonly RichTextPlugin[];
     /** The schema to edit with. Default: the standard and markdown specs plus every plugin's `nodes`. */
     schema?: Schema;
     /** Extra keymap layered over the base and plugin keymaps (wins). */

@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { createMarkdownStream } from '../../src/stream/index.js';
+import { createTextStream } from '../../src/stream/index.js';
 
 const tick = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-describe('createMarkdownStream', () => {
+describe('createTextStream', () => {
     it('accumulates appended chunks into value (sync flush)', () => {
-        const md = createMarkdownStream();
+        const md = createTextStream();
         md.append('# ');
         md.append('Hi');
         expect(md.value.value).toBe('# Hi');
     });
 
     it('coalesces appends within the flush interval', async () => {
-        const md = createMarkdownStream({ flushIntervalMs: 40 });
+        const md = createTextStream({ flushIntervalMs: 40 });
         md.append('a');
         md.append('b');
         expect(md.value.value).toBe(''); // not flushed yet
@@ -21,7 +21,7 @@ describe('createMarkdownStream', () => {
     });
 
     it('done() flushes immediately and sets finished', () => {
-        const md = createMarkdownStream({ flushIntervalMs: 1000 });
+        const md = createTextStream({ flushIntervalMs: 1000 });
         md.append('x');
         expect(md.value.value).toBe('');
         md.done();
@@ -30,7 +30,7 @@ describe('createMarkdownStream', () => {
     });
 
     it('reset() clears value and finished', () => {
-        const md = createMarkdownStream();
+        const md = createTextStream();
         md.append('hello');
         md.done();
         md.reset();
@@ -39,13 +39,13 @@ describe('createMarkdownStream', () => {
     });
 
     it('ignores empty chunks', () => {
-        const md = createMarkdownStream();
+        const md = createTextStream();
         md.append('');
         expect(md.value.value).toBe('');
     });
 
     it('appending after done() clears finished again', () => {
-        const md = createMarkdownStream();
+        const md = createTextStream();
         md.append('a');
         md.done();
         md.append('b');
@@ -54,7 +54,7 @@ describe('createMarkdownStream', () => {
     });
 });
 
-describe('createMarkdownStream().pipe', () => {
+describe('createTextStream().pipe', () => {
     async function* tokens(...chunks: string[]): AsyncGenerator<string> {
         for (const chunk of chunks) {
             await tick(1);
@@ -63,14 +63,14 @@ describe('createMarkdownStream().pipe', () => {
     }
 
     it('appends every chunk and calls done() when the source ends', async () => {
-        const md = createMarkdownStream({ flushIntervalMs: 1000 });
+        const md = createTextStream({ flushIntervalMs: 1000 });
         await md.pipe(tokens('# ', 'Hi', '!'));
         expect(md.value.value).toBe('# Hi!');
         expect(md.finished.value).toBe(true);
     });
 
     it('stops consuming on abort, returns the iterator, flushes, and does not call done()', async () => {
-        const md = createMarkdownStream({ flushIntervalMs: 1000 });
+        const md = createTextStream({ flushIntervalMs: 1000 });
         const controller = new AbortController();
         let returned = false;
         let pulls = 0;
@@ -99,7 +99,7 @@ describe('createMarkdownStream().pipe', () => {
     });
 
     it('breaks out of a for-await style generator on abort (finally runs)', async () => {
-        const md = createMarkdownStream();
+        const md = createTextStream();
         const controller = new AbortController();
         let cleaned = false;
         async function* gen(): AsyncGenerator<string> {
@@ -124,7 +124,7 @@ describe('createMarkdownStream().pipe', () => {
     });
 
     it('does nothing but flush when the signal is already aborted', async () => {
-        const md = createMarkdownStream({ flushIntervalMs: 1000 });
+        const md = createTextStream({ flushIntervalMs: 1000 });
         md.append('x');
         let pulled = false;
         const source: AsyncIterable<string> = {
@@ -142,7 +142,7 @@ describe('createMarkdownStream().pipe', () => {
     });
 
     it('rejects when the source throws, after flushing what arrived', async () => {
-        const md = createMarkdownStream({ flushIntervalMs: 1000 });
+        const md = createTextStream({ flushIntervalMs: 1000 });
         async function* failing(): AsyncGenerator<string> {
             yield 'a';
             yield 'b';

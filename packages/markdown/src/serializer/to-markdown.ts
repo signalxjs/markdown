@@ -6,13 +6,13 @@
  */
 
 import type { Node, Root, RootContent } from '../ast/index.js';
-import { resolvePlugins, type MarkdownPlugin } from '../plugin/index.js';
+import { resolveMarkdownPlugins, type RichTextPlugin } from '../plugin/index.js';
 import { serializeBlock, serializeBlocks } from './blocks.js';
 import type { SerializerOptions, State } from './inline.js';
 
 export interface ToMarkdownOptions {
     /** Plugins whose `serialize` rules handle extra (or override built-in) node types. */
-    plugins?: readonly MarkdownPlugin[];
+    plugins?: readonly RichTextPlugin[];
     /** Bullet list marker. Default `-`. */
     bullet?: '-' | '*' | '+';
     /** Emphasis delimiter. Default `*` (see `inline.ts` for when the other one is used). */
@@ -56,7 +56,7 @@ export function toMarkdown(node: Root | RootContent, options: ToMarkdownOptions 
     const state: State = {
         options: opts,
         raw: options as Readonly<Record<string, unknown>>,
-        rules: resolvePlugins(options.plugins).serialize,
+        rules: resolveMarkdownPlugins(options.plugins).serialize,
         indent: '',
         serialize: (n: Node) => serializeBlock(n, state),
         serializeBlocks: (nodes: readonly Node[]) => serializeBlocks(nodes, state),

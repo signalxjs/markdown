@@ -8,7 +8,7 @@
  */
 
 import type { Position } from '../ast/index.js';
-import type { InlineSyntaxExtension, MarkdownPlugin } from '../plugin/index.js';
+import type { InlineSyntaxExtension, MarkdownPluginSlice, RichTextPlugin } from '../plugin/index.js';
 import type { NodeSpec } from '../schema/index.js';
 
 /**
@@ -66,10 +66,15 @@ export const mentionNode: NodeSpec = {
     text: (node) => `@${(node as unknown as Mention).label}`,
 };
 
-/** The mention plugin: node spec, syntax and serializer. Pair it with a `mention` component per platform. */
-export const mentionPlugin: MarkdownPlugin = {
-    name: 'mention',
-    nodes: [mentionNode],
+/** The markdown slice of the mention plugin: `@[label](id)` in and out. */
+export const mentionMarkdown: MarkdownPluginSlice = {
     inline: [mentionSyntax],
     serialize: { mention: (node: Mention) => serializeMention(node) },
+};
+
+/** The mention plugin: node spec plus its markdown syntax. Pair it with a `mention` component per platform. */
+export const mentionPlugin: RichTextPlugin = {
+    name: 'mention',
+    nodes: [mentionNode],
+    formats: { markdown: mentionMarkdown },
 };

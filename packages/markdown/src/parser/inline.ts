@@ -29,8 +29,8 @@ import type {
     ReferenceType,
     Text,
 } from '../ast/index.js';
-import type { InlineMatchContext, InlineSyntaxExtension, ResolvedPlugins } from '../plugin/index.js';
-import { NO_PLUGINS } from '../plugin/index.js';
+import type { InlineMatchContext, InlineSyntaxExtension, ResolvedMarkdownPlugins } from '../plugin/index.js';
+import { NO_MARKDOWN_PLUGINS } from '../plugin/index.js';
 import {
     decodeEntity,
     isEscapable,
@@ -46,7 +46,7 @@ import { scanDestination, scanLabel, scanTitle, trimAutolinkTail, unescapeString
 
 export interface InlineOptions {
     /** Resolved plugins (inline extensions, entities). */
-    plugins?: ResolvedPlugins;
+    plugins?: ResolvedMarkdownPlugins;
     /**
      * Map a content index to a source point, for positions. Absent → nodes
      * carry no `position`.
@@ -56,7 +56,7 @@ export interface InlineOptions {
 
 /** Parse a text run into phrasing content. */
 export function parseInline(text: string, options?: InlineOptions): PhrasingContent[] {
-    const plugins = options?.plugins ?? NO_PLUGINS;
+    const plugins = options?.plugins ?? NO_MARKDOWN_PLUGINS;
     const pointAt = options?.pointAt;
     const state: State = { text, plugins, pointAt, entities: plugins.entities.size ? plugins.entities : undefined };
     const tokens = tokenize(state);
@@ -98,7 +98,7 @@ export function toPlainText(nodes: readonly PhrasingContent[]): string {
 
 interface State {
     text: string;
-    plugins: ResolvedPlugins;
+    plugins: ResolvedMarkdownPlugins;
     pointAt?: (i: number) => Point;
     entities?: ReadonlyMap<string, string>;
 }

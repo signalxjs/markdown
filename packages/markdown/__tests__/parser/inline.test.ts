@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseInline, toPlainText } from '../../src/parser/index.js';
-import { resolvePlugins } from '../../src/plugin/index.js';
-import type { InlineSyntaxExtension, MarkdownPlugin } from '../../src/plugin/index.js';
+import { resolveMarkdownPlugins } from '../../src/plugin/index.js';
+import type { InlineSyntaxExtension, RichTextPlugin } from '../../src/plugin/index.js';
 import type { PhrasingContent } from '../../src/ast/index.js';
 
 const text = (value: string): PhrasingContent => ({ type: 'text', value });
@@ -182,8 +182,8 @@ describe('parseInline (extensions)', () => {
             return { node: { type: 'mention', label: m[1], id: m[2] } as unknown as PhrasingContent, end: pos + m[0].length };
         },
     };
-    const plugin: MarkdownPlugin = { name: 'mention', inline: [mention] };
-    const plugins = resolvePlugins([plugin]);
+    const plugin: RichTextPlugin = { name: 'mention', formats: { markdown: { inline: [mention] } } };
+    const plugins = resolveMarkdownPlugins([plugin]);
 
     it('parses an extension node', () => {
         expect(parseInline('hi @[Andy](u1)!', { plugins })).toEqual([
@@ -234,7 +234,7 @@ describe('parseInline (extensions)', () => {
         };
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         for (const ext of [broken, greedy, throwing]) {
-            expect(parseInline('a @b', { plugins: resolvePlugins([{ name: 'p', inline: [ext] }]) })).toEqual([text('a @b')]);
+            expect(parseInline('a @b', { plugins: resolveMarkdownPlugins([{ name: 'p', formats: { markdown: { inline: [ext] } } }]) })).toEqual([text('a @b')]);
         }
         warn.mockRestore();
     });
@@ -242,7 +242,7 @@ describe('parseInline (extensions)', () => {
     it('never calls match when the trigger char is absent', () => {
         const spy = vi.fn(() => null);
         const ext: InlineSyntaxExtension = { name: 'x', triggerChars: ['@'], match: spy };
-        parseInline('plain **bold** `code` [l](h)', { plugins: resolvePlugins([{ name: 'p', inline: [ext] }]) });
+        parseInline('plain **bold** `code` [l](h)', { plugins: resolveMarkdownPlugins([{ name: 'p', formats: { markdown: { inline: [ext] } } }]) });
         expect(spy).not.toHaveBeenCalled();
     });
 
@@ -252,13 +252,13 @@ describe('parseInline (extensions)', () => {
             triggerChars: ['@'],
             match: (t, pos) => (t[pos + 1] === '!' ? { node: { type: 'first' } as unknown as PhrasingContent, end: pos + 2 } : null),
         };
-        const both = resolvePlugins([{ name: 'a', inline: [first] }, plugin]);
+        const both = resolveMarkdownPlugins([{ name: 'a', formats: { markdown: { inline: [first] } } }, plugin]);
         expect(parseInline('@!', { plugins: both })).toEqual([{ type: 'first' }]);
         expect(parseInline('@[a](b)', { plugins: both })[0]).toMatchObject({ type: 'mention' });
     });
 
     it('decodes plugin-provided entities', () => {
-        const p = resolvePlugins([{ name: 'e', entities: { shrug: '¯\\_(ツ)_/¯' } }]);
+        const p = resolveMarkdownPlugins([{ name: 'e', formats: { markdown: { entities: { shrug: '¯\\_(ツ)_/¯' } } } }]);
         expect(parseInline('&shrug;', { plugins: p })).toEqual([text('¯\\_(ツ)_/¯')]);
     });
 });
