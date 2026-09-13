@@ -87,6 +87,14 @@ describe('toFlat / toInline', () => {
         expect(toInline(hl, schema)).toEqual([{ type: 'highlight', color: 'y', children: [{ type: 'text', value: 'a' }] }, { type: 'text', value: 'b' }]);
     });
 
+    it('keeps the character under an unknown one-character mark span (only U+FFFC makes an unknown span an atom)', () => {
+        const flat = { text: 'ab', spans: [{ start: 0, end: 1, type: 'highlight' }] };
+        expect(toInline(flat, markdownSchema)).toEqual([{ type: 'highlight', children: [{ type: 'text', value: 'a' }] }, { type: 'text', value: 'b' }]);
+        expect(flatEquals(toFlat(toInline(flat, markdownSchema), markdownSchema), flat, markdownSchema)).toBe(true);
+        const chip = { text: `${ATOM_CHAR}b`, spans: [{ start: 0, end: 1, type: 'chip', attrs: { id: '1' } }] };
+        expect(toInline(chip, markdownSchema)).toEqual([{ type: 'chip', id: '1' }, { type: 'text', value: 'b' }]);
+    });
+
     it('keeps unresolved references as atoms', () => {
         const nodes = parseInline('see [foo][bar]');
         const flat = toFlat(nodes, markdownSchema);
