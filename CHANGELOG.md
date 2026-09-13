@@ -6,6 +6,8 @@ workspace shares one version line.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-13
+
 ### Added
 
 - **`@sigx/richtext-html`** (#32, phase 6 of #19). HTML as a first-class
