@@ -30,8 +30,10 @@ for token-by-token AI output), a save-friendly JSON document,
 (`./dom`), and a block-tree editor core (`./editor`) with a DOM editor
 (`./editor/dom`) — plus the formats and plugins on top of it:
 `@sigx/richtext-markdown` (the CommonMark + GFM parser and serializer,
-`markdownFormat`, the markdown editor preset), `@sigx/richtext-shiki` (Shiki
-highlighting as a plugin) and, next, `@sigx/richtext-html`. One plugin
+`markdownFormat`, the markdown editor preset), `@sigx/richtext-html` (a
+platform-free HTML parser and serializer, `htmlFormat`, the `text/html`
+clipboard preset) and `@sigx/richtext-shiki` (Shiki highlighting as a
+plugin). One plugin
 contract feeds every format, every renderer and the editor. Consumed by
 `@sigx/lynx-markdown` (native rendering and editing on Lynx), `@sigx/ai` chat
 UI on the web and, later, a terminal renderer. A pnpm workspace (ESM,
@@ -191,6 +193,14 @@ through the workspace links), then `pnpm --filter <example-name> dev`.
   `MarkdownPluginSlice` contract plugins fill under `formats.markdown`,
   `mentionPlugin`), `./editor` (`markdownPreset`) and `./testing` (`toHtml()`,
   the spec-conformance renderer). Peers on `@sigx/richtext`.
+- `packages/richtext-html` → `@sigx/richtext-html` — HTML as a format.
+  Entries: `.` (`parseHtml` — a hand-written tokenizer and tree with browser
+  style structure repair, no `DOMParser` — `toHtml` with the CommonMark
+  reference layout, `htmlFormat`, the `HtmlPluginSlice` contract plugins fill
+  under `formats.html` — `elements` by tag, `serialize` by node type —
+  `mentionHtml`) and `./editor` (`htmlPreset`, the `text/html` clipboard
+  writer). Peers on `@sigx/richtext`; only `href` / `src` survive parsing,
+  through the core's `sanitizeUrl`.
 - `packages/richtext-shiki` → `@sigx/richtext-shiki` — `shikiPlugin()` /
   `createShikiHighlighter()` behind the core's `CodeHighlighter` contract; the
   only package that imports `shiki`. Peers on `@sigx/richtext` and `shiki`.
@@ -228,6 +238,9 @@ Source layout (`packages/richtext/src`):
   top of the root layers (`editor/dom` may import `dom` — void blocks render
   through the DOM components — never the reverse); `testing/` is on top of
   everything and nothing imports from it. No cycles.
+- **`packages/richtext-html/src`**: `tokenizer.ts ← tree.ts ← parse.ts`,
+  `serialize.ts`, `plugin.ts` / `resolve.ts`, `format.ts`, `mention.ts`,
+  `editor/` (the preset). Same rule: the core through its entries only.
 - **`packages/richtext-markdown/src`** mirrors the shape: `parser/`,
   `serializer/`, `plugin/` (the markdown slice contract and its resolver),
   `format.ts`, `nodes.ts`, `definitions.ts`, `mention.ts`, `editor/` (the

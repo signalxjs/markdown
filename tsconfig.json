@@ -40,6 +40,12 @@
       ],
       "@sigx/richtext-shiki": [
         "./packages/richtext-shiki/src/index.ts"
+      ],
+      "@sigx/richtext-html": [
+        "./packages/richtext-html/src/index.ts"
+      ],
+      "@sigx/richtext-html/editor": [
+        "./packages/richtext-html/src/editor/index.ts"
       ]
     }
   },

@@ -6,8 +6,28 @@ workspace shares one version line.
 
 ## [Unreleased]
 
+### Added
+
+- **`@sigx/richtext-html`** (#32, phase 6 of #19). HTML as a first-class
+  `DocumentFormat`: `parseHtml` is a platform-free parser (a hand-written
+  tokenizer and tree, no `DOMParser`) for the markup that reaches a clipboard,
+  a CMS field or an LLM answer — the standard element table, browser-style
+  structure repair, whitespace collapsing, transparent unknown elements (or
+  `unknown: 'drop'`), only `href` / `src` kept and both through the core's
+  `sanitizeUrl`; `toHtml` writes the CommonMark reference layout (URLs
+  sanitised unless `sanitize: false`); `htmlFormat` (`text/html`) has no
+  incremental engine and no extra nodes. Plugins add HTML syntax under
+  `formats.html` (`HtmlPluginSlice`: `elements` rules by tag, `serialize`
+  rules by node type); `mentionHtml` is the reference slice
+  (`<span data-mention="id">@label</span>`). `htmlPreset` (`./editor`) puts
+  `text/html` on the clipboard next to the primary format's flavour. Markdown
+  ↔ HTML is `htmlFormat.serialize(markdownFormat.parse(src))` and back.
+
 ### Changed
 
+- `pickPasteFormat` (and so `Editor.paste`) tries every format's specific
+  flavours before `text/plain`: a markdown editor that also reads HTML parses
+  a browser's `text/html` instead of the plain text it ships alongside.
 - **Package split and repo rename** (#30, phase 5 of #19). `@sigx/markdown`
   becomes three packages — `@sigx/richtext` (the foundation: `.`, `./dom`,
   `./editor`, `./editor/dom`, `./testing`), `@sigx/richtext-markdown`

@@ -178,6 +178,20 @@ test('mentions: @ opens the people list and a pick inserts a chip', async ({ pag
     await expect(serialized(page)).toHaveText('hello');
 });
 
+test('pasting HTML parses the text/html flavour over text/plain', async ({ page }) => {
+    const p = block(page, 'b-0');
+    await p.click();
+    await page.keyboard.press('End');
+    await page.evaluate(() => {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', 'plain text that must not win');
+        dt.setData('text/html', '<meta charset="utf-8"><h2>Pasted</h2><ul><li>a</li><li>b</li></ul>');
+        document.activeElement!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await expect(page.locator('#editor [data-part="inline"][data-type="heading"]')).toHaveText('Pasted');
+    await expect(page.locator('#editor [data-part="list-item"]')).toHaveCount(2);
+});
+
 test('pasting markdown inserts blocks', async ({ page }) => {
     const p = block(page, 'b-0');
     await p.click();

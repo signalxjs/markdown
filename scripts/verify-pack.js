@@ -32,7 +32,7 @@ import { tmpdir } from 'os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 
-const PACKAGES = ['packages/richtext', 'packages/richtext-markdown', 'packages/richtext-shiki'];
+const PACKAGES = ['packages/richtext', 'packages/richtext-markdown', 'packages/richtext-html', 'packages/richtext-shiki'];
 
 /** Every runtime entry the tarballs expose, imported one by one. */
 const ENTRIES = [
@@ -44,6 +44,8 @@ const ENTRIES = [
     '@sigx/richtext-markdown',
     '@sigx/richtext-markdown/editor',
     '@sigx/richtext-markdown/testing',
+    '@sigx/richtext-html',
+    '@sigx/richtext-html/editor',
     '@sigx/richtext-shiki',
 ];
 

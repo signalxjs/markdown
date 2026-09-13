@@ -113,5 +113,27 @@
       "@sigx/runtime-dom",
       "shiki"
     ]
+  },
+  {
+    "name": "@sigx/richtext-html",
+    "path": "packages/richtext-html/dist/index.prod.js",
+    "limit": "10 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom"
+    ]
+  },
+  {
+    "name": "@sigx/richtext-html/editor",
+    "path": "packages/richtext-html/dist/editor.prod.js",
+    "limit": "2 KB",
+    "ignore": [
+      "@sigx/richtext",
+      "@sigx/reactivity",
+      "@sigx/runtime-core",
+      "@sigx/runtime-dom"
+    ]
   }
 ]

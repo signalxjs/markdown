@@ -1,0 +1,74 @@
+{
+    "name": "@sigx/richtext-html",
+    "version": "0.2.0",
+    "description": "HTML for @sigx/richtext — a platform-free parser and a serializer with the CommonMark reference layout, the html DocumentFormat and the text/html clipboard preset",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "development": "./dist/index.js",
+            "production": "./dist/index.prod.js",
+            "import": "./dist/index.js"
+        },
+        "./editor": {
+            "types": "./dist/editor/index.d.ts",
+            "development": "./dist/editor.js",
+            "production": "./dist/editor.prod.js",
+            "import": "./dist/editor.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "CHANGELOG.md"
+    ],
+    "sideEffects": false,
+    "scripts": {
+        "build": "vite build && vite build --mode prod-dist && tsc --emitDeclarationOnly",
+        "dev": "vite build --watch"
+    },
+    "keywords": [
+        "sigx",
+        "signalx",
+        "richtext",
+        "html",
+        "mdast",
+        "clipboard",
+        "editor"
+    ],
+    "author": "Andreas Ekdahl",
+    "license": "MIT",
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/signalxjs/richtext.git",
+        "directory": "packages/richtext-html"
+    },
+    "homepage": "https://sigx.dev/richtext/",
+    "bugs": {
+        "url": "https://github.com/signalxjs/richtext/issues"
+    },
+    "devDependencies": {
+        "@sigx/reactivity": "catalog:",
+        "@sigx/richtext": "workspace:*",
+        "@sigx/richtext-markdown": "workspace:*",
+        "@sigx/runtime-core": "catalog:",
+        "@sigx/vite": "catalog:",
+        "@types/node": "^25.9.1",
+        "sigx": "catalog:",
+        "typescript": "^6.0.3",
+        "vite": "^8.0.3"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "peerDependencies": {
+        "@sigx/reactivity": "^0.15.0",
+        "@sigx/richtext": "workspace:^",
+        "@sigx/runtime-core": "^0.15.0"
+    }
+}

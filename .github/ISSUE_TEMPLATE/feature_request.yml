@@ -45,6 +45,7 @@ body:
         - "@sigx/richtext/editor"
         - "@sigx/richtext/editor/dom"
         - "@sigx/richtext-markdown"
+        - "@sigx/richtext-html"
         - "@sigx/richtext-shiki"
         - Not sure
     validations:
